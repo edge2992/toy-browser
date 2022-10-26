@@ -1,18 +1,31 @@
 import socket
+import ssl
 from typing import Dict, Tuple
 
 
 def request(url: str) -> Tuple[Dict[str, str], str]:
-    assert url.startswith("http://")
-    url = url[len("http://") :]
+    scheme, url = url.split("://", 1)
+    assert scheme in ["http", "https"], "Unsupported scheme: {}".format(scheme)
+
     host, path = url.split("/", 1)
     path = "/" + path
+
+    port = 80 if scheme == "http" else 443
+
+    # example: http://example.org:8080/foo/bar
+    if ":" in host:
+        host, port = host.split(":", 1)
+        port = int(port)
 
     s = socket.socket(
         family=socket.AF_INET, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP
     )
 
-    s.connect((host, 80))
+    if scheme == "https":
+        ctx = ssl.create_default_context()
+        s = ctx.wrap_socket(s, server_hostname=host)
+
+    s.connect((host, port))
 
     s.send(
         "GET {} HTTP/1.0\r\n".format(path).encode("utf-8")
