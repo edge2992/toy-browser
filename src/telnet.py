@@ -4,10 +4,20 @@ from typing import Dict, Tuple
 
 
 def request(url: str) -> Tuple[Dict[str, str], str]:
-    scheme, url = url.split("://", 1)
-    assert scheme in ["http", "https"], "Unsupported scheme: {}".format(scheme)
+    scheme, url = url.split(":", 1)
+    assert scheme in ["http", "https", "data", "file"], "Unsupported scheme: {}".format(
+        scheme
+    )
 
-    host, path = url.split("/", 1)
+    if scheme == "data":
+        content_type, body = url.split(r',', 1)
+        return {"content-type": content_type}, body
+
+    if scheme == "file":
+        with open(url[2:], "r") as f:
+            return {}, f.read()
+
+    host, path = url.lstrip("//").split("/", 1)
     path = "/" + path
 
     port = 80 if scheme == "http" else 443
@@ -35,11 +45,15 @@ def request(url: str) -> Tuple[Dict[str, str], str]:
     else:
         header = {}
         header["Host"] = host
-        header["User-Agent"] = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0"
+        header[
+            "User-Agent"
+        ] = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0"
         header["Connection"] = "close"
         s.send(
             "GET {} HTTP/1.1\r\n".format(path).encode("utf-8")
-            + "\r\n".join("{}: {}".format(k, v) for k, v in header.items()).encode("utf-8")
+            + "\r\n".join("{}: {}".format(k, v) for k, v in header.items()).encode(
+                "utf-8"
+            )
             + "\r\n\r\n".encode("utf-8")
         )
 
