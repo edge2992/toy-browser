@@ -27,10 +27,21 @@ def request(url: str) -> Tuple[Dict[str, str], str]:
 
     s.connect((host, port))
 
-    s.send(
-        "GET {} HTTP/1.0\r\n".format(path).encode("utf-8")
-        + "HOST: {}\r\n\r\n".format(host).encode("utf-8")
-    )
+    if scheme == "http":
+        s.send(
+            "GET {} HTTP/1.0\r\n".format(path).encode("utf-8")
+            + "HOST: {}\r\n\r\n".format(host).encode("utf-8")
+        )
+    else:
+        header = {}
+        header["Host"] = host
+        header["User-Agent"] = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0"
+        header["Connection"] = "close"
+        s.send(
+            "GET {} HTTP/1.1\r\n".format(path).encode("utf-8")
+            + "\r\n".join("{}: {}".format(k, v) for k, v in header.items()).encode("utf-8")
+            + "\r\n\r\n".encode("utf-8")
+        )
 
     response = s.makefile("r", encoding="utf-8", newline="\r\n")
     statusline = response.readline()
