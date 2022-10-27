@@ -1,21 +1,36 @@
 import socket
 import ssl
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 
 
-def request(url: str) -> Tuple[Dict[str, str], str]:
+def request(url: str) -> Tuple[Dict[str, str], str, List[str]]:
+    option = []
     scheme, url = url.split(":", 1)
-    assert scheme in ["http", "https", "data", "file"], "Unsupported scheme: {}".format(
-        scheme
-    )
+    assert scheme in [
+        "http",
+        "https",
+        "data",
+        "file",
+        "view-source",
+    ], "Unsupported scheme: {}".format(scheme)
+
+    if scheme == "view-source":
+        scheme, url = url.split(":", 1)
+        assert scheme in [
+            "http",
+            "https",
+            "data",
+            "file",
+        ], "Unsupported scheme: {}".format(scheme)
+        option.append("view-source")
 
     if scheme == "data":
         content_type, body = url.split(r",", 1)
-        return {"content-type": content_type}, body
+        return {"content-type": content_type}, body, option
 
     if scheme == "file":
         with open(url[2:], "r") as f:
-            return {}, f.read()
+            return {}, f.read(), option
 
     host, path = url.lstrip("//").split("/", 1)
     path = "/" + path
@@ -75,14 +90,22 @@ def request(url: str) -> Tuple[Dict[str, str], str]:
 
     body = response.read()
     s.close()
-    return headers, body
+    return headers, body, option
 
 
-def show(body: str) -> None:
+def show(body: str, option: List[str]) -> None:
+    if "view-source" in option:
+        print(body)
+    else:
+        print(transform(body))
+
+
+def transform(body: str) -> str:
     in_angle = False
     out_angle = False
     in_entity = False
     entity = ""
+    out = ""
     tags = []
 
     ENTRY_DICT = {
@@ -108,17 +131,18 @@ def show(body: str) -> None:
         elif in_entity:
             if c == ";":
                 if "body" in tags:
-                    print(ENTRY_DICT[entity], end="")
+                    out += ENTRY_DICT[entity]
                 in_entity = False
             else:
                 entity += c
         elif not in_angle and "body" in tags:
-            print(c, end="")
+            out += c
+    return out
 
 
 def load(url: str) -> None:
-    headers, body = request(url)
-    show(body)
+    headers, body, option = request(url)
+    show(body, option)
 
 
 if __name__ == "__main__":
