@@ -10,7 +10,7 @@ def request(url: str) -> Tuple[Dict[str, str], str]:
     )
 
     if scheme == "data":
-        content_type, body = url.split(r',', 1)
+        content_type, body = url.split(r",", 1)
         return {"content-type": content_type}, body
 
     if scheme == "file":
@@ -80,12 +80,39 @@ def request(url: str) -> Tuple[Dict[str, str], str]:
 
 def show(body: str) -> None:
     in_angle = False
+    out_angle = False
+    in_entity = False
+    entity = ""
+    tags = []
+
+    ENTRY_DICT = {
+        "lt": "<",
+        "gt": ">",
+    }
+
     for c in body:
         if c == "<":
             in_angle = True
+            tags.append("")
         elif c == ">":
             in_angle = False
-        elif not in_angle:
+            out_angle = False
+        elif in_angle and c == "/":
+            out_angle = True
+            tags.pop()
+        elif in_angle and (not out_angle):
+            tags[len(tags) - 1] += c
+        elif c == "&":
+            in_entity = True
+            entity = ""
+        elif in_entity:
+            if c == ";":
+                if "body" in tags:
+                    print(ENTRY_DICT[entity], end="")
+                in_entity = False
+            else:
+                entity += c
+        elif not in_angle and "body" in tags:
             print(c, end="")
 
 
