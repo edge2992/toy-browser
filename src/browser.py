@@ -10,6 +10,7 @@ def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[s
 
     option = []
     scheme, url = url.split(":", 1)
+
     assert scheme in [
         "http",
         "https",
@@ -17,6 +18,14 @@ def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[s
         "file",
         "view-source",
     ], "Unsupported scheme: {}".format(scheme)
+
+    if scheme == "data":
+        content_type, body = url.split(r",", 1)
+        return {"content-type": content_type}, body, option
+
+    if scheme == "file":
+        with open(url[2:], "r") as f:
+            return {}, f.read(), option
 
     if scheme == "view-source":
         scheme, url = url.split(":", 1)
@@ -28,14 +37,6 @@ def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[s
         ], "Unsupported scheme: {}".format(scheme)
         option.append("view-source")
 
-    if scheme == "data":
-        content_type, body = url.split(r",", 1)
-        return {"content-type": content_type}, body, option
-
-    if scheme == "file":
-        with open(url[2:], "r") as f:
-            return {}, f.read(), option
-
     host, path = url.lstrip("//").split("/", 1)
     path = "/" + path
 
@@ -46,21 +47,29 @@ def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[s
         host, port = host.split(":", 1)
         port = int(port)
 
-    s = socket.socket(
+    with socket.socket(
         family=socket.AF_INET, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP
-    )
+    ) as sock:
+        if scheme == "https":
+            ctx = ssl.create_default_context()
+            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
+                headers, body = _get_headers_and_body(
+                    ssock, host, port, path, scheme, max_redirs
+                )
+                return headers, body, option
+        headers, body = _get_headers_and_body(
+            sock, host, port, path, scheme, max_redirs
+        )
+        return headers, body, option
 
-    if scheme == "https":
-        ctx = ssl.create_default_context()
-        s = ctx.wrap_socket(s, server_hostname=host)
 
-    s.connect((host, port))
+def _get_headers_and_body(sock, host, port, path, scheme, max_redirs):
+    sock.connect((host, port))
 
-    request_line: bytes
     if scheme == "http":
-        request_line = "GET {} HTTP/1.0\r\n".format(path).encode("utf-8")
+        sock.send("GET {} HTTP/1.0\r\n".format(path).encode("utf-8"))
     else:
-        request_line = "GET {} HTTP/1.1\r\n".format(path).encode("utf-8")
+        sock.send("GET {} HTTP/1.1\r\n".format(path).encode("utf-8"))
 
     header = {}
     header["Host"] = host
@@ -70,13 +79,12 @@ def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[s
     header["Connection"] = "close"
     header["Accept-Encoding"] = "gzip"
 
-    s.send(
-        request_line
-        + "\r\n".join("{}: {}".format(k, v) for k, v in header.items()).encode("utf-8")
-        + "\r\n\r\n".encode("utf-8")
+    sock.send(
+        "\r\n".join("{}: {}".format(k, v) for k, v in header.items()).encode("utf-8")
     )
+    sock.send("\r\n\r\n".encode("utf-8"))
 
-    response = s.makefile("rb", newline="\r\n")
+    response = sock.makefile("rb", newline="\r\n")
     statusline = response.readline().decode("utf-8")
     version, status, explanation = statusline.split(" ", 2)
     assert status in ("200", "301", "302"), "Unsupported status: {}\n{}".format(
@@ -92,31 +100,46 @@ def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[s
         headers[header.lower()] = value.strip()
 
     if "location" in headers:
-        return request(headers["location"], max_redirs - 1)
+        headers, body, option = request(headers["location"], max_redirs - 1)
+        return headers, body
 
-    if "transfer-encoding" not in headers:
-        raw_body = response.read()
+    if "transfer-encoding" in headers:
+        if headers["content-encoding"] == "chunked":
+            # TODO:未確認
+            print("transfer-encoding: chunked!")
+            body = unchunked(response)
+        else:
+            raise Exception(
+                "Unsupported transfer-encoding: {}".format(headers["transfer-encoding"])
+            )
     else:
-        assert headers["transfer-encoding"] == "chunked"
-        # TODO:未確認
-        print("transfer-encoding: chunked!")
-        raw_body = chunked_reader(response)
+        body = response.read()
 
     if "content-encoding" in headers:
         assert headers["content-encoding"] == "gzip"
         # gzip形式のデータをTransfer-Encodingのチャンクで受信する
         print("gziped file!")
-        raw_body = gzip.decompress(raw_body)
+        body = gzip.decompress(body)
 
-    body = raw_body.decode("utf-8")
-    s.close()
-    return headers, body, option
+    body = body.decode("utf-8")
+    sock.close()
+    return headers, body
 
 
-def chunked_reader(response):
+def unchunked(response):
     body = b""
-    while response.readline.decode("utf-8") != 0:
-        body += response.readline
+
+    def get_chunk_size():
+        chunk_size = response.readline().rstrip()
+        return int(chunk_size, 16)
+    
+    while True:
+        chunk_size = get_chunk_size()
+        if chunk_size == 0:
+            break
+        else:
+            body += response.read(chunk_size)
+            response.read(2)
     return body
 
 
