@@ -1,3 +1,4 @@
+import gzip
 import socket
 import ssl
 from typing import Dict, List, Tuple
@@ -52,45 +53,63 @@ def request(url: str) -> Tuple[Dict[str, str], str, List[str]]:
 
     s.connect((host, port))
 
+    request_line: bytes
     if scheme == "http":
-        s.send(
-            "GET {} HTTP/1.0\r\n".format(path).encode("utf-8")
-            + "HOST: {}\r\n\r\n".format(host).encode("utf-8")
-        )
+        request_line = "GET {} HTTP/1.0\r\n".format(path).encode("utf-8")
     else:
-        header = {}
-        header["Host"] = host
-        header[
-            "User-Agent"
-        ] = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0"
-        header["Connection"] = "close"
-        s.send(
-            "GET {} HTTP/1.1\r\n".format(path).encode("utf-8")
-            + "\r\n".join("{}: {}".format(k, v) for k, v in header.items()).encode(
-                "utf-8"
-            )
-            + "\r\n\r\n".encode("utf-8")
-        )
+        request_line = "GET {} HTTP/1.1\r\n".format(path).encode("utf-8")
 
-    response = s.makefile("r", encoding="utf-8", newline="\r\n")
-    statusline = response.readline()
+    header = {}
+    header["Host"] = host
+    header[
+        "User-Agent"
+    ] = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0"
+    header["Connection"] = "close"
+    header["Accept-Encoding"] = "gzip"
+
+    s.send(
+        request_line
+        + "\r\n".join("{}: {}".format(k, v) for k, v in header.items()).encode("utf-8")
+        + "\r\n\r\n".encode("utf-8")
+    )
+
+    response = s.makefile("rb", newline="\r\n")
+    statusline = response.readline().decode("utf-8")
     version, status, explanation = statusline.split(" ", 2)
     assert status == "200", "{}: {}".format(status, explanation)
 
     headers = {}
     while True:
-        line = response.readline()
+        line = response.readline().decode("utf-8")
         if line == "\r\n":
             break
         header, value = line.split(":", 1)
         headers[header.lower()] = value.strip()
 
-    assert "transfer-encoding" not in headers
-    assert "content-encoding" not in headers
+    if "transfer-encoding" not in headers:
+        raw_body = response.read()
+    else:
+        assert headers["transfer-encoding"] == "chunked"
+        # TODO:未確認
+        print("transfer-encoding: chunked!")
+        raw_body = chunked_reader(response)
 
-    body = response.read()
+    if "content-encoding" in headers:
+        assert headers["content-encoding"] == "gzip"
+        # gzip形式のデータをTransfer-Encodingのチャンクで受信する
+        print("gziped file!")
+        raw_body = gzip.decompress(raw_body)
+
+    body = raw_body.decode("utf-8")
     s.close()
     return headers, body, option
+
+
+def chunked_reader(response):
+    body = b""
+    while response.readline.decode("utf-8") != 0:
+        body += response.readline
+    return body
 
 
 def show(body: str, option: List[str]) -> None:

@@ -1,0 +1,51 @@
+{
+    "terminal.integrated.env.linux": {
+        "PYTHONPATH": "${workspaceFolder}"
+    },
+    "python.linting.flake8Enabled": true,
+    "python.linting.mypyEnabled": true,
+    "python.linting.enabled": true,
+    "python.linting.flake8Args": [
+        "--ignore=W293, W504, E402 E203, W503, E711, E712",
+        "--exclude=src/pynucleic/thermo.py",
+        "--max-line-length=150",
+        "--max-complexity=20"
+    ],
+    "python.formatting.provider": "black",
+    "[python]": {
+        "editor.defaultFormatter": null,
+        "editor.formatOnSave": true,
+    },
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/*/**": true,
+        "**/.hg/store/**": true,
+        "**/data/**": true,
+        "**/annotated_data/**": true,
+        ".mypy_cache/**": true,
+        ".pytest_cache/**": true,
+        "**/*.png": true,
+    },
+    "search.exclude": {
+        "*/.git": true,
+        "**/*.bed": true,
+        "**/*.bam": true,
+        "**/*.bigBed": true,
+    },
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.analysis.typeCheckingMode": "basic",
+    // "python.analysis.logLevel": "Trace",
+    "python.analysis.exclude": [
+        "**/_pycache__",
+        ".git",
+        "**/*.bed",
+        "**/*.png",
+        "**/*.bigBed",
+    ],
+    "python.analysis.diagnosticMode": "workspace"
+}
