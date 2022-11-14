@@ -4,7 +4,10 @@ import ssl
 from typing import Dict, List, Tuple
 
 
-def request(url: str) -> Tuple[Dict[str, str], str, List[str]]:
+def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[str]]:
+    if max_redirs == 0:
+        raise Exception("Too many redirects")
+
     option = []
     scheme, url = url.split(":", 1)
     assert scheme in [
@@ -76,7 +79,9 @@ def request(url: str) -> Tuple[Dict[str, str], str, List[str]]:
     response = s.makefile("rb", newline="\r\n")
     statusline = response.readline().decode("utf-8")
     version, status, explanation = statusline.split(" ", 2)
-    assert status == "200", "{}: {}".format(status, explanation)
+    assert status in ("200", "301", "302"), "Unsupported status: {}\n{}".format(
+        status, explanation
+    )
 
     headers = {}
     while True:
@@ -85,6 +90,9 @@ def request(url: str) -> Tuple[Dict[str, str], str, List[str]]:
             break
         header, value = line.split(":", 1)
         headers[header.lower()] = value.strip()
+
+    if "location" in headers:
+        return request(headers["location"], max_redirs - 1)
 
     if "transfer-encoding" not in headers:
         raw_body = response.read()
