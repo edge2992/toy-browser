@@ -104,7 +104,7 @@ def _get_headers_and_body(sock, host, port, path, scheme, max_redirs):
         return headers, body
 
     if "transfer-encoding" in headers:
-        if headers["content-encoding"] == "chunked":
+        if headers["transfer-encoding"] == "chunked":
             # TODO:未確認
             print("transfer-encoding: chunked!")
             body = unchunked(response)
@@ -132,7 +132,7 @@ def unchunked(response):
     def get_chunk_size():
         chunk_size = response.readline().rstrip()
         return int(chunk_size, 16)
-    
+
     while True:
         chunk_size = get_chunk_size()
         if chunk_size == 0:
@@ -148,6 +148,19 @@ def show(body: str, option: List[str]) -> None:
         print(body)
     else:
         print(transform(body))
+
+
+def lex(body: str) -> str:
+    text = ""
+    in_angle = False
+    for c in body:
+        if c == "<":
+            in_angle = True
+        elif c == ">":
+            in_angle = False
+        elif not in_angle:
+            text += c
+    return text
 
 
 def transform(body: str) -> str:
