@@ -104,7 +104,7 @@ def _get_headers_and_body(sock, host, port, path, scheme, max_redirs):
         return headers, body
 
     if "transfer-encoding" in headers:
-        if headers["content-encoding"] == "chunked":
+        if headers["transfer-encoding"] == "chunked":
             # TODO:未確認
             print("transfer-encoding: chunked!")
             body = unchunked(response)
@@ -132,7 +132,7 @@ def unchunked(response):
     def get_chunk_size():
         chunk_size = response.readline().rstrip()
         return int(chunk_size, 16)
-    
+
     while True:
         chunk_size = get_chunk_size()
         if chunk_size == 0:
@@ -147,10 +147,10 @@ def show(body: str, option: List[str]) -> None:
     if "view-source" in option:
         print(body)
     else:
-        print(transform(body))
+        print(lex(body))
 
 
-def transform(body: str) -> str:
+def lex(body: str) -> str:
     in_angle = False
     out_angle = False
     in_entity = False
@@ -168,6 +168,9 @@ def transform(body: str) -> str:
             in_angle = True
             tags.append("")
         elif c == ">":
+            if not out_angle:
+                # TODO: classやidも保存する
+                tags[len(tags) - 1] = tags[len(tags) - 1].split()[0]
             in_angle = False
             out_angle = False
         elif in_angle and c == "/":
