@@ -147,23 +147,10 @@ def show(body: str, option: List[str]) -> None:
     if "view-source" in option:
         print(body)
     else:
-        print(transform(body))
+        print(lex(body))
 
 
 def lex(body: str) -> str:
-    text = ""
-    in_angle = False
-    for c in body:
-        if c == "<":
-            in_angle = True
-        elif c == ">":
-            in_angle = False
-        elif not in_angle:
-            text += c
-    return text
-
-
-def transform(body: str) -> str:
     in_angle = False
     out_angle = False
     in_entity = False
@@ -181,6 +168,9 @@ def transform(body: str) -> str:
             in_angle = True
             tags.append("")
         elif c == ">":
+            if not out_angle:
+                # TODO: classやidも保存する
+                tags[len(tags) - 1] = tags[len(tags) - 1].split()[0]
             in_angle = False
             out_angle = False
         elif in_angle and c == "/":
