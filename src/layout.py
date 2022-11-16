@@ -1,9 +1,7 @@
 import tkinter
 import tkinter.font
 from typing import Dict, List, Tuple, Union
-from src.text import Tag, Text
-from tqdm import tqdm
-import time
+from src.text import Text, Element
 
 HSTEP, VSTEP = 13, 18
 FONTS: Dict[Tuple[int, str, str], tkinter.font.Font] = {}  # font cache
@@ -25,7 +23,7 @@ def get_font_metric(size: int, weight: str, slant: str) -> dict:
 
 
 class Layout:
-    def __init__(self, tokens: List[Union[Text, Tag]], width: int, hstep: int):
+    def __init__(self, nodes: Union[Text, Element], width: int, hstep: int):
         self.display_list: List[Tuple[int, int, str, tkinter.font.Font]] = []
         self.line: List[Tuple[int, str, tkinter.font.Font]] = []
         self.font_metrics: List[dict] = []
@@ -37,33 +35,41 @@ class Layout:
         self.width = width
         self.hstep = hstep
         self.max_scroll = 0
-        for tok in tqdm(tokens):
-            self.token(tok)
+        self.recurse(nodes)
 
-    def token(self, tok):
-        if isinstance(tok, Text):
-            self.text(tok)
-        elif tok.tag == "i":
+    def open_tag(self, tag):
+        if tag == "i":
             self.style = "italic"
-        elif tok.tag == "/i":
-            self.style = "roman"
-        elif tok.tag == "b":
+        elif tag == "b":
             self.weight = "bold"
-        elif tok.tag == "/b":
+        elif tag == "small":
+            self.size -= 2
+        elif tag == "big":
+            self.size += 2
+
+    def close_tag(self, tag):
+        if tag == "i":
+            self.style = "roman"
+        elif tag == "b":
             self.weight = "normal"
-        elif tok.tag == "small":
-            self.size -= 2
-        elif tok.tag == "/small":
+        elif tag == "small":
             self.size += 2
-        elif tok.tag == "big":
-            self.size += 2
-        elif tok.tag == "/big":
+        elif tag == "big":
             self.size -= 2
-        elif tok.tag == "br":
+        elif tag == "br":
             self.flush()
-        elif tok.tag == "/p":
+        elif tag == "p":
             self.flush()
             self.cursor_y += VSTEP
+
+    def recurse(self, tree):
+        if isinstance(tree, Text):
+            self.text(tree)
+        else:
+            self.open_tag(tree.tag)
+            for child in tree.children:
+                self.recurse(child)
+            self.close_tag(tree.tag)
 
     def text(self, tok):
         # English
