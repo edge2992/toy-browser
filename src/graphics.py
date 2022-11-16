@@ -4,7 +4,7 @@ import sys
 from layout import Layout
 
 from src.browser import request
-from src.text import lex
+from src.text import HTMLParser
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -28,16 +28,16 @@ class Browser:
         self.window.bind("<Left>", self.fontdown)
         self.window.bind("<Button-5>", self.scrolldown)
         self.window.bind("<Button-4>", self.scrollup)
-        self.window.bind(
-            "<Configure>", self.resize
-        )  # TODO: キャンバス生成時に3回呼ばれてレンダリングし直してしまう
+        # self.window.bind(
+        #     "<Configure>", self.resize
+        # )  # TODO: キャンバス生成時に3回呼ばれてレンダリングし直してしまう
         self.canvas = tkinter.Canvas(self.window, width=self.width, height=self.height)
         self.canvas.pack(fill=tkinter.BOTH, expand=True)
 
     def load(self, url: str):
         _, body, _ = request(url)
-        self.tokens = lex(body)
-        layout = Layout(self.tokens, self.width, self.hstep)
+        self.nodes = HTMLParser(body).parse()
+        layout = Layout(self.nodes, self.width, self.hstep)
         self.display_list = layout.display_list
         self.max_scroll = layout.max_scroll
         self.draw()
@@ -67,7 +67,7 @@ class Browser:
         self.width = e.width
         self.height = e.height
         print("resize")
-        self.display_list = Layout(self.tokens, self.width, self.hstep).display_list
+        self.display_list = Layout(self.nodes, self.width, self.hstep).display_list
         self.draw()
 
     def fontup(self, e):
@@ -76,7 +76,7 @@ class Browser:
         self.hstep += 2
         self.vstep += 2
         print("fontup")
-        self.display_list = Layout(self.tokens, self.width, self.hstep).display_list
+        self.display_list = Layout(self.nodes, self.width, self.hstep).display_list
         self.draw()
 
     def fontdown(self, e):
@@ -85,7 +85,7 @@ class Browser:
         self.hstep -= 2
         self.vstep -= 2
         print("fontdown")
-        self.display_list = Layout(self.tokens, self.width, self.hstep).display_list
+        self.display_list = Layout(self.nodes, self.width, self.hstep).display_list
         self.draw()
 
 
