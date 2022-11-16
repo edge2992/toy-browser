@@ -1,8 +1,9 @@
 import tkinter
 import tkinter.font
 from typing import Dict, List, Tuple, Union
-from src.text import Text, Element
+from src.text import Text
 
+WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
 FONTS: Dict[Tuple[int, str, str], tkinter.font.Font] = {}  # font cache
 FONT_METRICS: Dict[Tuple[int, str, str], dict] = {}
@@ -22,20 +23,105 @@ def get_font_metric(size: int, weight: str, slant: str) -> dict:
     return FONT_METRICS[key]
 
 
-class Layout:
-    def __init__(self, nodes: Union[Text, Element], width: int, hstep: int):
-        self.display_list: List[Tuple[int, int, str, tkinter.font.Font]] = []
-        self.line: List[Tuple[int, str, tkinter.font.Font]] = []
-        self.font_metrics: List[dict] = []
-        self.cursor_x = HSTEP
-        self.cursor_y = VSTEP
+BLOCK_ELEMENTS = [
+    "html",
+    "body",
+    "article",
+    "section",
+    "nav",
+    "aside",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hgroup",
+    "header",
+    "footer",
+    "address",
+    "p",
+    "hr",
+    "pre",
+    "blockquote",
+    "ol",
+    "ul",
+    "menu",
+    "li",
+    "dl",
+    "dt",
+    "dd",
+    "figure",
+    "figcaption",
+    "main",
+    "div",
+    "table",
+    "form",
+    "fieldset",
+    "legend",
+    "details",
+    "summary",
+]
+
+
+def layout_mode(node):
+    if isinstance(node, Text):
+        return "inline"
+    elif node.children:
+        for child in node.children:
+            if isinstance(child, Text):
+                continue
+            if child.tag in BLOCK_ELEMENTS:
+                return "block"
+        return "inline"
+    else:
+        return "block"
+
+
+class InlineLayout:
+    def __init__(self, node, parent, previous):
+        self.node = node
+        self.parent = parent
+        self.previous = previous
+        self.children = []
+        self.x = None
+        self.y = None
+        self.width = None
+        self.height = None
+        self.display_list = None
+        self.font_metrics = []
+
+    def layout(self):
+        self.width = self.parent.width
+        self.x = self.parent.x
+
+        if self.previous:
+            self.y = self.previous.y + self.previous.height
+        else:
+            self.y = self.parent.y
+
+        self.display_list = []
         self.weight = "normal"
         self.style = "roman"
         self.size = 16
-        self.width = width
-        self.hstep = hstep
-        self.max_scroll = 0
-        self.recurse(nodes)
+
+        self.cursor_x = self.x
+        self.cursor_y = self.y
+
+        self.line = []
+        self.recurse(self.node)
+        self.flush()
+
+        self.height = self.cursor_y - self.y
+
+    def recurse(self, node):
+        if isinstance(node, Text):
+            self.text(node)
+        else:
+            self.open_tag(node.tag)
+            for child in node.children:
+                self.recurse(child)
+            self.close_tag(node.tag)
 
     def open_tag(self, tag):
         if tag == "i":
@@ -46,6 +132,8 @@ class Layout:
             self.size -= 2
         elif tag == "big":
             self.size += 2
+        elif tag == "br":
+            self.flush()
 
     def close_tag(self, tag):
         if tag == "i":
@@ -56,29 +144,20 @@ class Layout:
             self.size += 2
         elif tag == "big":
             self.size -= 2
-        elif tag == "br":
-            self.flush()
         elif tag == "p":
             self.flush()
             self.cursor_y += VSTEP
-
-    def recurse(self, tree):
-        if isinstance(tree, Text):
-            self.text(tree)
-        else:
-            self.open_tag(tree.tag)
-            for child in tree.children:
-                self.recurse(child)
-            self.close_tag(tree.tag)
 
     def text(self, tok):
         # English
         font = get_font(self.size, self.weight, self.style)
         metric = get_font_metric(self.size, self.weight, self.style)
         for word in tok.text.split():
-            self.max_scroll = max(self.max_scroll, self.cursor_y)
+            # self.max_scroll = max(self.max_scroll, self.cursor_y)
             w = font.measure(word)
-            if self.cursor_x + w > self.width - self.hstep:
+            assert self.cursor_x
+            assert self.width
+            if self.cursor_x + w > self.width - HSTEP:
                 self.flush()
             self.line.append((self.cursor_x, word, font))
             self.font_metrics.append(metric)
@@ -104,10 +183,87 @@ class Layout:
         assert len(self.line) == len(self.font_metrics)
         for (x, word, font), metric in zip(self.line, self.font_metrics):
             y = int(baseline - metric["ascent"])
+            assert isinstance(self.display_list, list)
             self.display_list.append((x, y, word, font))
 
+        self.cursor_x = self.x
         max_descent = max([metric["descent"] for metric in self.font_metrics])
-        self.cursor_x = HSTEP
-        self.cursor_y = baseline + 1.25 * max_descent
         self.line = []
         self.font_metrics = []
+        # self.cursor_x = HSTEP
+        self.cursor_y = baseline + 1.25 * max_descent
+
+    def paint(self, display_list):
+        display_list.extend(self.display_list)
+
+    def __repr__(self) -> str:
+        return "InlineLayout(x={}, y={}, width={}, height={}, node={})".format(
+            self.x, self.y, self.width, self.height, self.node
+        )
+
+
+class BlockLayout:
+    def __init__(self, node, parent, previous):
+        self.node = node
+        self.parent = parent
+        self.previous = previous
+        self.children = []
+        self.x = None
+        self.y = None
+        self.width = None
+        self.height = None
+
+    def layout(self):
+        previous = None
+        # create child layout object
+        for child in self.node.children:
+            if layout_mode(child) == "inline":
+                next = InlineLayout(child, self, previous)
+            else:
+                next = BlockLayout(child, self, previous)
+            self.children.append(next)
+            previous = next
+        # width, x, yをparentとpreviousを参考に計算する
+        self.width = self.parent.width
+        self.x = self.parent.x
+        if self.previous:
+            self.y = self.previous.y + self.previous.height
+        else:
+            self.y = self.parent.y
+        # childrenで再帰的にlayoutを実行する
+        for child in self.children:
+            child.layout()
+        # childrenを全て読んでheightを計算
+        self.height = sum([child.height for child in self.children])
+
+    def paint(self, display_list):
+        for child in self.children:
+            child.paint(display_list)
+
+    def __repr__(self):
+        return "BlockLayout(x={}, y={}, width={}, height={}, node={})".format(
+            self.x, self.y, self.width, self.height, self.node
+        )
+
+
+class DocumentLayout:
+    def __init__(self, node):
+        self.node = node
+        self.parent = None
+        self.children = []
+
+    def layout(self):
+        child = BlockLayout(self.node, self, None)
+        self.children.append(child)
+        self.width = WIDTH - 2 * HSTEP
+        self.x = HSTEP
+        self.y = VSTEP
+        child.layout()
+        assert child.height
+        self.height = child.height + 2 * VSTEP
+
+    def paint(self, display_list):
+        self.children[0].paint(display_list)
+
+    def __repr__(self):
+        return "DocumentLayout()"

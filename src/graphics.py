@@ -1,8 +1,8 @@
 import tkinter
 import tkinter.font
 import sys
-from layout import Layout
 
+from src.layout import DocumentLayout
 from src.browser import request
 from src.text import HTMLParser
 
@@ -37,9 +37,10 @@ class Browser:
     def load(self, url: str):
         _, body, _ = request(url)
         self.nodes = HTMLParser(body).parse()
-        layout = Layout(self.nodes, self.width, self.hstep)
-        self.display_list = layout.display_list
-        self.max_scroll = layout.max_scroll
+        self.document = DocumentLayout(self.nodes)
+        self.document.layout()
+        self.display_list = []
+        self.document.paint(self.display_list)
         self.draw()
 
     def draw(self):
@@ -67,7 +68,9 @@ class Browser:
         self.width = e.width
         self.height = e.height
         print("resize")
-        self.display_list = Layout(self.nodes, self.width, self.hstep).display_list
+        self.document.layout()
+        self.display_list = []
+        self.document.paint(self.display_list)
         self.draw()
 
     def fontup(self, e):
@@ -76,7 +79,9 @@ class Browser:
         self.hstep += 2
         self.vstep += 2
         print("fontup")
-        self.display_list = Layout(self.nodes, self.width, self.hstep).display_list
+        self.document.layout()
+        self.display_list = []
+        self.document.paint(self.display_list)
         self.draw()
 
     def fontdown(self, e):
@@ -85,7 +90,9 @@ class Browser:
         self.hstep -= 2
         self.vstep -= 2
         print("fontdown")
-        self.display_list = Layout(self.nodes, self.width, self.hstep).display_list
+        self.document.layout()
+        self.display_list = []
+        self.document.paint(self.display_list)
         self.draw()
 
 
