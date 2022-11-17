@@ -1,7 +1,8 @@
 import tkinter
 import tkinter.font
 from typing import Dict, List, Tuple, Union
-from src.text import Text
+from src.draw import DrawRect, DrawText
+from src.text import Element, Text
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -79,17 +80,18 @@ def layout_mode(node):
 
 
 class InlineLayout:
+    x: int
+    y: int
+    width: int
+    height: int
+    display_list: list = []
+    font_metrics: list = []
+
     def __init__(self, node, parent, previous):
         self.node = node
         self.parent = parent
         self.previous = previous
         self.children = []
-        self.x = None
-        self.y = None
-        self.width = None
-        self.height = None
-        self.display_list = None
-        self.font_metrics = []
 
     def layout(self):
         self.width = self.parent.width
@@ -194,7 +196,12 @@ class InlineLayout:
         self.cursor_y = baseline + 1.25 * max_descent
 
     def paint(self, display_list):
-        display_list.extend(self.display_list)
+        if isinstance(self.node, Element) and self.node.tag == "pre":
+            x2, y2 = self.x + self.width, self.y + self.height
+            display_list.append(DrawRect(self.x, self.y, x2, y2, "gray"))
+        assert isinstance(self.display_list, list)
+        for x, y, word, font in self.display_list:
+            display_list.append(DrawText(x, y, word, font))
 
     def __repr__(self) -> str:
         return "InlineLayout(x={}, y={}, width={}, height={}, node={})".format(

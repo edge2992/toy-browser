@@ -45,17 +45,17 @@ class Browser:
 
     def draw(self):
         self.canvas.delete("all")
-        for x, y, c, f in self.display_list:
-            if y > self.scroll + self.height:
+        for cmd in self.display_list:
+            if cmd.top > self.scroll + self.height:
                 continue
-            if y + self.vstep < self.scroll:
+            if cmd.bottom < self.scroll:
                 continue
-            self.canvas.create_text(x, y - self.scroll, text=c, font=f, anchor="nw")
+            cmd.execute(self.scroll, self.canvas)
 
     def scrolldown(self, e):
         print("scrolldown")
-        self.scroll += SCROLL_STEP
-        self.scroll = min(self.max_scroll, self.scroll)
+        max_y = self.document.height - self.height
+        self.scroll = min(self.scroll + SCROLL_STEP, max_y)
         self.draw()
 
     def scrollup(self, e):
