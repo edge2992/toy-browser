@@ -1,8 +1,8 @@
 import tkinter
 import tkinter.font
 from typing import Dict, List, Tuple, Union
-from src.draw import DrawRect, DrawText
-from src.text import Element, Text
+from src.draw import Draw, DrawRect, DrawText
+from src.text import Element, HTMLNode, Text
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -65,7 +65,7 @@ BLOCK_ELEMENTS = [
 ]
 
 
-def layout_mode(node):
+def layout_mode(node: HTMLNode) -> str:
     if isinstance(node, Text):
         return "inline"
     elif node.children:
@@ -79,15 +79,34 @@ def layout_mode(node):
         return "block"
 
 
-class InlineLayout:
+class LayoutObject:
     x: int
     y: int
     width: int
     height: int
-    display_list: list = []
-    font_metrics: list = []
+    node: HTMLNode
 
-    def __init__(self, node, parent, previous):
+    def paint(self, display_list: List[Draw]):
+        raise NotImplementedError
+
+    def layout(self):
+        raise NotImplementedError
+
+
+class InlineLayout(LayoutObject):
+    display_list: List[Tuple[int, int, str, tkinter.font.Font]] = []
+    font_metrics: List[dict] = []
+    line: List[Tuple[int, str, tkinter.font.Font]] = []
+    weight = "normal"
+    style = "roman"
+    size = 16
+
+    def __init__(
+        self,
+        node: HTMLNode,
+        parent: LayoutObject,
+        previous: Union[LayoutObject, None],
+    ):
         self.node = node
         self.parent = parent
         self.previous = previous
@@ -102,21 +121,15 @@ class InlineLayout:
         else:
             self.y = self.parent.y
 
-        self.display_list = []
-        self.weight = "normal"
-        self.style = "roman"
-        self.size = 16
-
         self.cursor_x = self.x
         self.cursor_y = self.y
 
-        self.line = []
         self.recurse(self.node)
         self.flush()
 
         self.height = self.cursor_y - self.y
 
-    def recurse(self, node):
+    def recurse(self, node: HTMLNode):
         if isinstance(node, Text):
             self.text(node)
         else:
@@ -125,7 +138,7 @@ class InlineLayout:
                 self.recurse(child)
             self.close_tag(node.tag)
 
-    def open_tag(self, tag):
+    def open_tag(self, tag: str) -> None:
         if tag == "i":
             self.style = "italic"
         elif tag == "b":
@@ -137,7 +150,7 @@ class InlineLayout:
         elif tag == "br":
             self.flush()
 
-    def close_tag(self, tag):
+    def close_tag(self, tag: str) -> None:
         if tag == "i":
             self.style = "roman"
         elif tag == "b":
@@ -150,15 +163,12 @@ class InlineLayout:
             self.flush()
             self.cursor_y += VSTEP
 
-    def text(self, tok):
+    def text(self, tok: Text) -> None:
         # English
         font = get_font(self.size, self.weight, self.style)
         metric = get_font_metric(self.size, self.weight, self.style)
         for word in tok.text.split():
-            # self.max_scroll = max(self.max_scroll, self.cursor_y)
             w = font.measure(word)
-            assert self.cursor_x
-            assert self.width
             if self.cursor_x + w > self.width - HSTEP:
                 self.flush()
             self.line.append((self.cursor_x, word, font))
@@ -175,14 +185,16 @@ class InlineLayout:
         #     self.line.append((self.cursor_x, c, font))
         #     self.cursor_x += w
 
-    def flush(self):
+    def flush(self) -> None:
         if not self.line:
             return
         # metrics = [font.metrics() for _, _, font in self.line]
 
         max_ascent = max([metric["ascent"] for metric in self.font_metrics])
         baseline = self.cursor_y + 1.25 * max_ascent
-        assert len(self.line) == len(self.font_metrics)
+        assert len(self.line) == len(self.font_metrics), "{} != {}".format(
+            len(self.line), len(self.font_metrics)
+        )
         for (x, word, font), metric in zip(self.line, self.font_metrics):
             y = int(baseline - metric["ascent"])
             assert isinstance(self.display_list, list)
@@ -195,7 +207,7 @@ class InlineLayout:
         # self.cursor_x = HSTEP
         self.cursor_y = baseline + 1.25 * max_descent
 
-    def paint(self, display_list):
+    def paint(self, display_list: List[Draw]) -> None:
         if isinstance(self.node, Element) and self.node.tag == "pre":
             x2, y2 = self.x + self.width, self.y + self.height
             display_list.append(DrawRect(self.x, self.y, x2, y2, "gray"))
@@ -209,18 +221,16 @@ class InlineLayout:
         )
 
 
-class BlockLayout:
-    def __init__(self, node, parent, previous):
+class BlockLayout(LayoutObject):
+    def __init__(
+        self, node: HTMLNode, parent: LayoutObject, previous: Union[LayoutObject, None]
+    ):
         self.node = node
         self.parent = parent
         self.previous = previous
-        self.children = []
-        self.x = None
-        self.y = None
-        self.width = None
-        self.height = None
+        self.children: List[LayoutObject] = []
 
-    def layout(self):
+    def layout(self) -> None:
         previous = None
         # create child layout object
         for child in self.node.children:
@@ -243,7 +253,7 @@ class BlockLayout:
         # childrenを全て読んでheightを計算
         self.height = sum([child.height for child in self.children])
 
-    def paint(self, display_list):
+    def paint(self, display_list: List[Draw]) -> None:
         for child in self.children:
             child.paint(display_list)
 
@@ -253,23 +263,22 @@ class BlockLayout:
         )
 
 
-class DocumentLayout:
-    def __init__(self, node):
+class DocumentLayout(LayoutObject):
+    def __init__(self, node: HTMLNode):
         self.node = node
-        self.parent = None
-        self.children = []
+        self.parent: Union[LayoutObject, None] = None
+        self.children: List[LayoutObject] = []
 
-    def layout(self):
+    def layout(self) -> None:
         child = BlockLayout(self.node, self, None)
         self.children.append(child)
         self.width = WIDTH - 2 * HSTEP
         self.x = HSTEP
         self.y = VSTEP
         child.layout()
-        assert child.height
         self.height = child.height + 2 * VSTEP
 
-    def paint(self, display_list):
+    def paint(self, display_list: List[Draw]) -> None:
         self.children[0].paint(display_list)
 
     def __repr__(self):

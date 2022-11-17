@@ -141,6 +141,9 @@ class HTMLParser:
         return tag, attributes
 
 
+HTMLNode = Union[Element, Text]
+
+
 def print_tree(node, indent: int = 0):
     print(" " * indent, node)
     for child in node.children:

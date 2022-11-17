@@ -1,10 +1,12 @@
 import tkinter
 import tkinter.font
 import sys
+from typing import List
 
 from src.layout import DocumentLayout
 from src.browser import request
 from src.text import HTMLParser
+from src.draw import Draw
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -39,7 +41,7 @@ class Browser:
         self.nodes = HTMLParser(body).parse()
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
-        self.display_list = []
+        self.display_list: List[Draw] = []
         self.document.paint(self.display_list)
         self.draw()
 
