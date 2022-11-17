@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Tuple, Union
 
 
 class Text:
@@ -53,11 +53,11 @@ class HTMLParser:
         "script",
     ]
 
-    def __init__(self, body):
+    def __init__(self, body: str):
         self.body = body
         self.unfinished = []
 
-    def implicit_tags(self, tag):
+    def implicit_tags(self, tag: Union[str, None]) -> None:
         while True:
             open_tags = [node.tag for node in self.unfinished]
             if open_tags == [] and tag != "html":
@@ -74,7 +74,7 @@ class HTMLParser:
             else:
                 break
 
-    def add_text(self, text: str):
+    def add_text(self, text: str) -> None:
         if text.isspace():
             return
         self.implicit_tags(None)
@@ -82,7 +82,7 @@ class HTMLParser:
         node = Text(text, parent)
         parent.children.append(node)
 
-    def add_tag(self, tag: str):
+    def add_tag(self, tag: str) -> None:
         tag, attributes = self.get_attributes(tag)
         if tag.startswith("!"):
             return  # doctype
@@ -126,7 +126,7 @@ class HTMLParser:
             self.add_text(text)
         return self.finish()
 
-    def get_attributes(self, text):
+    def get_attributes(self, text: str) -> Tuple[str, dict]:
         parts = text.split()
         tag = parts[0].lower()
         attributes = {}
@@ -139,6 +139,9 @@ class HTMLParser:
             else:
                 attributes[attrpair.lower()] = ""
         return tag, attributes
+
+
+HTMLNode = Union[Element, Text]
 
 
 def print_tree(node, indent: int = 0):

@@ -1,10 +1,12 @@
 import tkinter
 import tkinter.font
 import sys
-from layout import Layout
+from typing import List
 
+from src.layout import DocumentLayout
 from src.browser import request
 from src.text import HTMLParser
+from src.draw import Draw
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -37,24 +39,25 @@ class Browser:
     def load(self, url: str):
         _, body, _ = request(url)
         self.nodes = HTMLParser(body).parse()
-        layout = Layout(self.nodes, self.width, self.hstep)
-        self.display_list = layout.display_list
-        self.max_scroll = layout.max_scroll
+        self.document = DocumentLayout(self.nodes)
+        self.document.layout()
+        self.display_list: List[Draw] = []
+        self.document.paint(self.display_list)
         self.draw()
 
     def draw(self):
         self.canvas.delete("all")
-        for x, y, c, f in self.display_list:
-            if y > self.scroll + self.height:
+        for cmd in self.display_list:
+            if cmd.top > self.scroll + self.height:
                 continue
-            if y + self.vstep < self.scroll:
+            if cmd.bottom < self.scroll:
                 continue
-            self.canvas.create_text(x, y - self.scroll, text=c, font=f, anchor="nw")
+            cmd.execute(self.scroll, self.canvas)
 
     def scrolldown(self, e):
         print("scrolldown")
-        self.scroll += SCROLL_STEP
-        self.scroll = min(self.max_scroll, self.scroll)
+        max_y = self.document.height - self.height
+        self.scroll = min(self.scroll + SCROLL_STEP, max_y)
         self.draw()
 
     def scrollup(self, e):
@@ -67,7 +70,9 @@ class Browser:
         self.width = e.width
         self.height = e.height
         print("resize")
-        self.display_list = Layout(self.nodes, self.width, self.hstep).display_list
+        self.document.layout()
+        self.display_list = []
+        self.document.paint(self.display_list)
         self.draw()
 
     def fontup(self, e):
@@ -76,7 +81,9 @@ class Browser:
         self.hstep += 2
         self.vstep += 2
         print("fontup")
-        self.display_list = Layout(self.nodes, self.width, self.hstep).display_list
+        self.document.layout()
+        self.display_list = []
+        self.document.paint(self.display_list)
         self.draw()
 
     def fontdown(self, e):
@@ -85,7 +92,9 @@ class Browser:
         self.hstep -= 2
         self.vstep -= 2
         print("fontdown")
-        self.display_list = Layout(self.nodes, self.width, self.hstep).display_list
+        self.document.layout()
+        self.display_list = []
+        self.document.paint(self.display_list)
         self.draw()
 
 
