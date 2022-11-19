@@ -86,7 +86,19 @@ class LayoutObject:
     width: int
     height: int
     node: HTMLNode
-    children: List[LayoutObject] = []
+    parent: Union[LayoutObject, None]
+    children: List[LayoutObject]
+
+    def __init__(
+        self,
+        node: HTMLNode,
+        parent: LayoutObject,
+        previous: Union[LayoutObject, None],
+    ):
+        self.node = node
+        self.parent = parent
+        self.previous = previous
+        self.children: List[LayoutObject] = []
 
     def paint(self, display_list: List[Draw]):
         raise NotImplementedError
@@ -99,19 +111,10 @@ class InlineLayout(LayoutObject):
     display_list: List[Tuple[int, int, str, tkinter.font.Font]] = []
     font_metrics: List[dict] = []
     line: List[Tuple[int, str, tkinter.font.Font]] = []
+    parent: LayoutObject
     weight = "normal"
     style = "roman"
     size = 16
-
-    def __init__(
-        self,
-        node: HTMLNode,
-        parent: LayoutObject,
-        previous: Union[LayoutObject, None],
-    ):
-        self.node = node
-        self.parent = parent
-        self.previous = previous
 
     def layout(self):
         self.width = self.parent.width
@@ -211,6 +214,11 @@ class InlineLayout(LayoutObject):
         self.cursor_y = baseline + 1.25 * max_descent
 
     def paint(self, display_list: List[Draw]) -> None:
+        bgcolor = self.node.style.get("background-color", "transparent")
+        if bgcolor != "transparent":
+            print("paint", bgcolor)
+            x2, y2 = self.x + self.width, self.y + self.height
+            display_list.append(DrawRect(self.x, self.y, x2, y2, bgcolor))
         if isinstance(self.node, Element) and self.node.tag == "pre":
             x2, y2 = self.x + self.width, self.y + self.height
             display_list.append(DrawRect(self.x, self.y, x2, y2, "gray"))
@@ -225,12 +233,7 @@ class InlineLayout(LayoutObject):
 
 
 class BlockLayout(LayoutObject):
-    def __init__(
-        self, node: HTMLNode, parent: LayoutObject, previous: Union[LayoutObject, None]
-    ):
-        self.node = node
-        self.parent = parent
-        self.previous = previous
+    parent: LayoutObject
 
     def layout(self) -> None:
         previous = None
