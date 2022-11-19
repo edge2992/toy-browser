@@ -3,10 +3,11 @@ import tkinter
 
 
 class Draw:
-    top: int
-    left: int
-    right: int
-    bottom: int
+    def __init__(self):
+        self.top: int
+        self.left: int
+        self.right: int
+        self.bottom: int
 
     def execute(self, scroll: int, canvas: tkinter.Canvas):
         raise NotImplementedError
@@ -24,6 +25,9 @@ class DrawText(Draw):
         canvas.create_text(
             self.left, self.top - scroll, text=self.text, font=self.font, anchor="nw"
         )
+
+    def __repr__(self) -> str:
+        return f"DrawText({self.left}, {self.top}, {self.text})"
 
 
 class DrawRect(Draw):
@@ -43,3 +47,6 @@ class DrawRect(Draw):
             width=0,
             fill=self.color,
         )
+
+    def __repr__(self) -> str:
+        return f"DrawRect({self.color})"

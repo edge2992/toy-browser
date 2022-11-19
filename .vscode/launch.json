@@ -22,6 +22,17 @@
             "args": [
                 "https://browser.engineering/styles.html"
             ]
+        },
+        {
+            "name": "Python: example.org",
+            "type": "python",
+            "request": "launch",
+            "program": "src/graphics.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "https://example.org/"
+            ]
         }
     ]
 }

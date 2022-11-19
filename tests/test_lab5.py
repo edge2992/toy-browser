@@ -47,6 +47,22 @@ def test_layout_tree(mocker):
         print(browser.display_list)
 
 
+def test_layout_mode2():
+    from src.text import print_tree, HTMLParser
+    from src.layout import layout_mode
+
+    sample_html = "<div></div><div>text</div><div><div></div>text</div><span></span><span>text</span>"
+    parser = HTMLParser(sample_html)
+    document_tree = parser.parse()
+    print_tree(document_tree)
+    assert layout_mode(document_tree.children[0]) == "block"
+    assert layout_mode(document_tree.children[0].children[0]) == "block"
+    assert layout_mode(document_tree.children[0].children[1]) == "inline"
+    assert layout_mode(document_tree.children[0].children[2]) == "block"
+    assert layout_mode(document_tree.children[0].children[3]) == "block"
+    assert layout_mode(document_tree.children[0].children[4]) == "inline"
+
+
 def test_layout_tree_head(example_org_body):
     from src.text import HTMLParser, print_tree
     from src.layout import DocumentLayout

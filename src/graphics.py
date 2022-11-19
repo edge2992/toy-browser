@@ -5,7 +5,7 @@ from typing import List
 
 from src.layout import DocumentLayout
 from src.browser import request
-from src.text import HTMLParser, print_tree
+from src.text import HTMLParser
 from src.draw import Draw
 from src.cssparser import style
 
@@ -31,20 +31,18 @@ class Browser:
         self.window.bind("<Left>", self.fontdown)
         self.window.bind("<Button-5>", self.scrolldown)
         self.window.bind("<Button-4>", self.scrollup)
-        self.window.bind(
-            "<Configure>", self.resize
-        )  # TODO: キャンバス生成時に3回呼ばれてレンダリングし直してしまう
+        # self.window.bind(
+        #     "<Configure>", self.resize
+        # )  # TODO: キャンバス生成時に3回呼ばれてレンダリングし直してしまう
         self.canvas = tkinter.Canvas(self.window, width=self.width, height=self.height)
         self.canvas.pack(fill=tkinter.BOTH, expand=True)
 
     def load(self, url: str):
         _, body, _ = request(url)
         self.nodes = HTMLParser(body).parse()
-        print_tree(self.nodes)
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
-        print_tree(self.document)
-        # style(self.document)
+        style(self.nodes)
         self.display_list: List[Draw] = []
         self.document.paint(self.display_list)
         self.draw()

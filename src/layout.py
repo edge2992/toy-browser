@@ -81,24 +81,20 @@ def layout_mode(node: HTMLNode) -> str:
 
 
 class LayoutObject:
-    x: int
-    y: int
-    width: int
-    height: int
-    node: HTMLNode
-    parent: Union[LayoutObject, None]
-    children: List[LayoutObject]
-
     def __init__(
         self,
         node: HTMLNode,
         parent: LayoutObject,
         previous: Union[LayoutObject, None],
     ):
-        self.node = node
-        self.parent = parent
+        self.node: HTMLNode = node
+        self.parent: Union[LayoutObject, None] = parent
         self.previous = previous
         self.children: List[LayoutObject] = []
+        self.x: int
+        self.y: int
+        self.width: int
+        self.height: int
 
     def paint(self, display_list: List[Draw]):
         raise NotImplementedError
@@ -108,13 +104,20 @@ class LayoutObject:
 
 
 class InlineLayout(LayoutObject):
-    display_list: List[Tuple[int, int, str, tkinter.font.Font]] = []
-    font_metrics: List[dict] = []
-    line: List[Tuple[int, str, tkinter.font.Font]] = []
-    parent: LayoutObject
-    weight = "normal"
-    style = "roman"
-    size = 16
+    def __init__(
+        self,
+        node: HTMLNode,
+        parent: LayoutObject,
+        previous: Union[LayoutObject, None],
+    ):
+        super().__init__(node, parent, previous)
+        self.parent: LayoutObject = parent
+        self.weight = "normal"
+        self.style = "roman"
+        self.size = 16
+        self.display_list: List[Tuple[int, int, str, tkinter.font.Font]] = []
+        self.font_metrics: List[dict] = []
+        self.line: List[Tuple[int, str, tkinter.font.Font]] = []
 
     def layout(self):
         self.width = self.parent.width
@@ -203,7 +206,6 @@ class InlineLayout(LayoutObject):
         )
         for (x, word, font), metric in zip(self.line, self.font_metrics):
             y = int(baseline - metric["ascent"])
-            assert isinstance(self.display_list, list)
             self.display_list.append((x, y, word, font))
 
         self.cursor_x = self.x
@@ -216,12 +218,12 @@ class InlineLayout(LayoutObject):
     def paint(self, display_list: List[Draw]) -> None:
         bgcolor = self.node.style.get("background-color", "transparent")
         if bgcolor != "transparent":
-            print("paint", bgcolor)
+            print("bg_color_paint", bgcolor)
             x2, y2 = self.x + self.width, self.y + self.height
             display_list.append(DrawRect(self.x, self.y, x2, y2, bgcolor))
-        if isinstance(self.node, Element) and self.node.tag == "pre":
-            x2, y2 = self.x + self.width, self.y + self.height
-            display_list.append(DrawRect(self.x, self.y, x2, y2, "gray"))
+        # if isinstance(self.node, Element) and self.node.tag == "pre":
+        #     x2, y2 = self.x + self.width, self.y + self.height
+        #     display_list.append(DrawRect(self.x, self.y, x2, y2, "gray"))
         assert isinstance(self.display_list, list)
         for x, y, word, font in self.display_list:
             display_list.append(DrawText(x, y, word, font))
@@ -233,7 +235,14 @@ class InlineLayout(LayoutObject):
 
 
 class BlockLayout(LayoutObject):
-    parent: LayoutObject
+    def __init__(
+        self,
+        node: HTMLNode,
+        parent: LayoutObject,
+        previous: Union[LayoutObject, None],
+    ):
+        super().__init__(node, parent, previous)
+        self.parent: LayoutObject = parent
 
     def layout(self) -> None:
         previous = None
