@@ -1,11 +1,12 @@
 from __future__ import annotations
 from abc import ABC
-from typing import Tuple, Union, List
+from typing import Dict, Tuple, Union, List
 
 
 class HTMLNode(ABC):
     parent: Union[HTMLNode, None]
     children: List[HTMLNode]
+    style: Dict[str, str] = {}
 
 
 class Text(HTMLNode):
@@ -13,6 +14,7 @@ class Text(HTMLNode):
         self.text = text
         self.children = []
         self.parent = parent
+        # self.style = {}
 
     def __repr__(self):
         return repr(self.text)
@@ -24,6 +26,7 @@ class Element(HTMLNode):
         self.attributes = attributes
         self.children = []
         self.parent = parent
+        # self.style = {}
 
     def __repr__(self):
         return "<" + self.tag + ">"
@@ -96,10 +99,14 @@ class HTMLParser:
         self.implicit_tags(tag)
         parent: Union[Element, None]
         if tag.startswith("/"):
-            if len(self.unfinished) == 0:
+            if len(self.unfinished) == 1:
                 return
             node = self.unfinished.pop()
             parent = self.unfinished[-1]
+            parent.children.append(node)
+        elif tag in SELF_CLOSING_TAGS:
+            parent = self.unfinished[-1]
+            node = Element(tag, attributes, parent)
             parent.children.append(node)
         else:
             parent = self.unfinished[-1] if self.unfinished else None
@@ -141,7 +148,7 @@ class HTMLParser:
         for attrpair in parts[1:]:
             if "=" in attrpair:
                 key, value = attrpair.split("=", 1)
-                if len(value) > 2 and value[0] in ["'", '"']:
+                if len(value) > 2 and value[0] in ["'", '\"']:
                     value = value[1:-1]
                 attributes[key.lower()] = value
             else:
