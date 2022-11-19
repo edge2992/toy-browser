@@ -64,3 +64,73 @@ def test_unknown_cssparser():
     print(selector)
     selector = CSSParser("a { p: v; q:: u }").parse()
     print(selector)
+
+
+def test_compute_style():
+    from src.text import Element
+    from src.cssparser import compute_style
+
+    html = Element("html", {}, None)
+    body = Element("body", {}, html)
+    div = Element("div", {}, body)
+    v = compute_style(body, "property", "value")
+    assert v == "value"
+    v = compute_style(body, "font-size", "12px")
+    assert v == "12px"
+    html.style = {"font-size": "30px"}
+    assert compute_style(body, "font-size", "100%") == "30.0px"
+    assert compute_style(body, "font-size", "80%") == "24.0px"
+    body.style = {"font-size": "10px"}
+    assert compute_style(div, "font-size", "100%") == "10.0px"
+    assert compute_style(div, "font-size", "80%") == "8.0px"
+
+
+def test_style1():
+    from src.text import Element
+    from src.cssparser import style
+
+    html = Element("html", {}, None)
+    body = Element("body", {}, html)
+    div = Element("div", {}, body)
+    style(html, [])
+    style(body, [])
+    style(div, [])
+    assert html.style == body.style
+    assert body.style == div.style
+    print(html.style)
+    print(body.style)
+    print(div.style)
+
+
+def test_style2():
+    from src.text import Element
+    from src.cssparser import style, CSSParser
+
+    html = Element("html", {}, None)
+    body = Element("body", {}, html)
+    div = Element("div", {}, body)
+
+    rules = CSSParser(
+        "html { font-size: 10px} body { font-size: 90% } div { font-size: 90% } "
+    ).parse()
+    style(html, rules)
+    style(body, rules)
+    style(div, rules)
+    assert html.style["font-size"] == "10px"
+    assert body.style["font-size"] == "9.0px"
+    assert div.style["font-size"] == "8.1px"
+
+
+def test_priority(mocker):
+    from src.graphics import Browser
+
+    with mocker.patch(
+        "src.browser._get_headers_and_body",
+        return_value=("", '<div style="color:blue">Test</div>'),
+    ):
+        browser = Browser()
+        browser.load("http://bar.com/")
+        assert (
+            browser.document.children[0].children[0].children[0].node.style["color"]
+            == "blue"
+        )

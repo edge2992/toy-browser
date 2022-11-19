@@ -112,9 +112,6 @@ class InlineLayout(LayoutObject):
     ):
         super().__init__(node, parent, previous)
         self.parent: LayoutObject = parent
-        self.weight = "normal"
-        self.style = "roman"
-        self.size = 16
         self.display_list: List[Tuple[int, int, str, tkinter.font.Font, str]] = []
         self.font_metrics: List[dict] = []
         self.line: List[Tuple[int, str, tkinter.font.Font, str]] = []
@@ -140,37 +137,12 @@ class InlineLayout(LayoutObject):
         if isinstance(node, Text):
             self.text(node)
         elif isinstance(node, Element):
-            self.open_tag(node.tag)
+            if node.tag == "br":
+                self.flush()
             for child in node.children:
                 self.recurse(child)
-            self.close_tag(node.tag)
         else:
             raise ValueError("Unknown node type")
-
-    def open_tag(self, tag: str) -> None:
-        if tag == "i":
-            self.style = "italic"
-        elif tag == "b":
-            self.weight = "bold"
-        elif tag == "small":
-            self.size -= 2
-        elif tag == "big":
-            self.size += 2
-        elif tag == "br":
-            self.flush()
-
-    def close_tag(self, tag: str) -> None:
-        if tag == "i":
-            self.style = "roman"
-        elif tag == "b":
-            self.weight = "normal"
-        elif tag == "small":
-            self.size += 2
-        elif tag == "big":
-            self.size -= 2
-        elif tag == "p":
-            self.flush()
-            self.cursor_y += VSTEP
 
     def text(self, node: Text) -> None:
         # English
@@ -190,20 +162,9 @@ class InlineLayout(LayoutObject):
             self.font_metrics.append(metric)
             self.cursor_x += w + font.measure(" ")
 
-        # Chinese
-        # font = get_font(self.size, self.weight, self.style)
-        # for c in tok.text:
-        #     self.max_scroll = max(self.max_scroll, self.cursor_y)
-        #     w = font.measure(c)
-        #     if self.cursor_x >= self.width - self.hstep:
-        #         self.flush()
-        #     self.line.append((self.cursor_x, c, font))
-        #     self.cursor_x += w
-
     def flush(self) -> None:
         if not self.line:
             return
-        # metrics = [font.metrics() for _, _, font in self.line]
 
         max_ascent = max([metric["ascent"] for metric in self.font_metrics])
         baseline = self.cursor_y + 1.25 * max_ascent
@@ -226,9 +187,6 @@ class InlineLayout(LayoutObject):
         if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
             display_list.append(DrawRect(self.x, self.y, x2, y2, bgcolor))
-        # if isinstance(self.node, Element) and self.node.tag == "pre":
-        #     x2, y2 = self.x + self.width, self.y + self.height
-        #     display_list.append(DrawRect(self.x, self.y, x2, y2, "gray"))
         assert isinstance(self.display_list, list)
         for x, y, word, font, color in self.display_list:
             display_list.append(DrawText(x, y, word, font, color))
