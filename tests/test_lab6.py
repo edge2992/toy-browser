@@ -134,3 +134,12 @@ def test_priority(mocker):
             browser.document.children[0].children[0].children[0].node.style["color"]
             == "blue"
         )
+
+
+def test_resolve_url():
+    from src.util.url import resolve_url
+
+    assert resolve_url("http://foo.com", "http://bar.com/") == "http://foo.com"
+    assert resolve_url("/url", "http://bar.com/") == "http://bar.com/url"
+    assert resolve_url("url2", "http://bar.com/url1") == "http://bar.com/url2"
+    assert resolve_url("url2", "http://bar.com/url1/") == "http://bar.com/url1/url2"
