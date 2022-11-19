@@ -1,3 +1,4 @@
+from __future__ import annotations
 import tkinter
 import tkinter.font
 from typing import Dict, List, Tuple, Union
@@ -72,7 +73,7 @@ def layout_mode(node: HTMLNode) -> str:
         for child in node.children:
             if isinstance(child, Text):
                 continue
-            if child.tag in BLOCK_ELEMENTS:
+            if isinstance(child, Element) and child.tag in BLOCK_ELEMENTS:
                 return "block"
         return "inline"
     else:
@@ -85,6 +86,7 @@ class LayoutObject:
     width: int
     height: int
     node: HTMLNode
+    children: List[LayoutObject] = []
 
     def paint(self, display_list: List[Draw]):
         raise NotImplementedError
@@ -110,7 +112,6 @@ class InlineLayout(LayoutObject):
         self.node = node
         self.parent = parent
         self.previous = previous
-        self.children = []
 
     def layout(self):
         self.width = self.parent.width
@@ -132,11 +133,13 @@ class InlineLayout(LayoutObject):
     def recurse(self, node: HTMLNode):
         if isinstance(node, Text):
             self.text(node)
-        else:
+        elif isinstance(node, Element):
             self.open_tag(node.tag)
             for child in node.children:
                 self.recurse(child)
             self.close_tag(node.tag)
+        else:
+            raise ValueError("Unknown node type")
 
     def open_tag(self, tag: str) -> None:
         if tag == "i":
@@ -228,12 +231,12 @@ class BlockLayout(LayoutObject):
         self.node = node
         self.parent = parent
         self.previous = previous
-        self.children: List[LayoutObject] = []
 
     def layout(self) -> None:
         previous = None
         # create child layout object
         for child in self.node.children:
+            next: LayoutObject
             if layout_mode(child) == "inline":
                 next = InlineLayout(child, self, previous)
             else:
@@ -248,8 +251,8 @@ class BlockLayout(LayoutObject):
         else:
             self.y = self.parent.y
         # childrenで再帰的にlayoutを実行する
-        for child in self.children:
-            child.layout()
+        for child_layout in self.children:
+            child_layout.layout()
         # childrenを全て読んでheightを計算
         self.height = sum([child.height for child in self.children])
 

@@ -1,7 +1,14 @@
-from typing import Tuple, Union
+from __future__ import annotations
+from abc import ABC
+from typing import Tuple, Union, List
 
 
-class Text:
+class HTMLNode(ABC):
+    parent: Union[HTMLNode, None]
+    children: List[HTMLNode]
+
+
+class Text(HTMLNode):
     def __init__(self, text: str, parent):
         self.text = text
         self.children = []
@@ -11,7 +18,7 @@ class Text:
         return repr(self.text)
 
 
-class Element:
+class Element(HTMLNode):
     def __init__(self, tag: str, attributes: dict, parent):
         self.tag = tag
         self.attributes = attributes
@@ -55,7 +62,7 @@ class HTMLParser:
 
     def __init__(self, body: str):
         self.body = body
-        self.unfinished = []
+        self.unfinished: List[Element] = []
 
     def implicit_tags(self, tag: Union[str, None]) -> None:
         while True:
@@ -87,6 +94,7 @@ class HTMLParser:
         if tag.startswith("!"):
             return  # doctype
         self.implicit_tags(tag)
+        parent: Union[Element, None]
         if tag.startswith("/"):
             if len(self.unfinished) == 0:
                 return
@@ -139,9 +147,6 @@ class HTMLParser:
             else:
                 attributes[attrpair.lower()] = ""
         return tag, attributes
-
-
-HTMLNode = Union[Element, Text]
 
 
 def print_tree(node, indent: int = 0):
