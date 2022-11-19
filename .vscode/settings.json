@@ -14,6 +14,12 @@
         "--max-line-length=150",
         "--max-complexity=20"
     ],
+    "flake8.args": [
+        "--ignore=W293, W504, E402 E203, W503, E711, E712",
+        "--exclude=src/pynucleic/thermo.py",
+        "--max-line-length=150",
+        "--max-complexity=20"
+    ],
     "python.formatting.provider": "black",
     "[python]": {
         "editor.defaultFormatter": null,
