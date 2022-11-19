@@ -5,9 +5,12 @@ from typing import List
 
 from src.layout import DocumentLayout
 from src.browser import request
-from src.text import HTMLParser
+from src.text import Element, HTMLParser
 from src.draw import Draw
-from src.cssparser import style
+from src.cssparser import style, CSSParser
+from src.util.node import tree_to_list
+from src.util.url import resolve_url
+from src.selector import cascade_priority
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -34,13 +37,33 @@ class Browser:
         # self.window.bind(
         #     "<Configure>", self.resize
         # )  # TODO: キャンバス生成時に3回呼ばれてレンダリングし直してしまう
-        self.canvas = tkinter.Canvas(self.window, width=self.width, height=self.height)
+        self.canvas = tkinter.Canvas(
+            self.window, width=self.width, height=self.height, bg="white"
+        )
         self.canvas.pack(fill=tkinter.BOTH, expand=True)
+        with open("src/browser.css") as f:
+            self.default_style_sheet = CSSParser(f.read()).parse()
 
     def load(self, url: str):
         _, body, _ = request(url)
         self.nodes = HTMLParser(body).parse()
-        style(self.nodes)
+        links = [
+            node.attributes["href"]
+            for node in tree_to_list(self.nodes, [])
+            if isinstance(node, Element)
+            and node.tag == "link"
+            and "href" in node.attributes
+            and node.attributes.get("rel") == "stylesheet"
+        ]
+        rules = self.default_style_sheet.copy()
+        for link in links:
+            try:
+                _, body, _ = request(resolve_url(link, url))
+            except Exception as e:
+                print(e)
+                continue
+            rules.extend(CSSParser(body).parse())
+        style(self.nodes, sorted(rules, key=cascade_priority))
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
         self.display_list: List[Draw] = []

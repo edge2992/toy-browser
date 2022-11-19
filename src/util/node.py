@@ -1,0 +1,8 @@
+from typing import List
+
+
+def tree_to_list(tree, list: List) -> List:
+    list.append(tree)
+    for child in tree.children:
+        tree_to_list(child, list)
+    return list

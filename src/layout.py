@@ -115,9 +115,9 @@ class InlineLayout(LayoutObject):
         self.weight = "normal"
         self.style = "roman"
         self.size = 16
-        self.display_list: List[Tuple[int, int, str, tkinter.font.Font]] = []
+        self.display_list: List[Tuple[int, int, str, tkinter.font.Font, str]] = []
         self.font_metrics: List[dict] = []
-        self.line: List[Tuple[int, str, tkinter.font.Font]] = []
+        self.line: List[Tuple[int, str, tkinter.font.Font, str]] = []
 
     def layout(self):
         self.width = self.parent.width
@@ -172,15 +172,21 @@ class InlineLayout(LayoutObject):
             self.flush()
             self.cursor_y += VSTEP
 
-    def text(self, tok: Text) -> None:
+    def text(self, node: Text) -> None:
         # English
-        font = get_font(self.size, self.weight, self.style)
-        metric = get_font_metric(self.size, self.weight, self.style)
-        for word in tok.text.split():
+        weight = node.style["font-weight"]
+        style = node.style["font-style"]
+        color = node.style["color"]
+        if style == "normal":
+            style = "roman"
+        size = int(float(node.style["font-size"][:-2]) * 0.75)
+        font = get_font(size, weight, style)
+        metric = get_font_metric(size, weight, style)
+        for word in node.text.split():
             w = font.measure(word)
             if self.cursor_x + w > self.width - HSTEP:
                 self.flush()
-            self.line.append((self.cursor_x, word, font))
+            self.line.append((self.cursor_x, word, font, color))
             self.font_metrics.append(metric)
             self.cursor_x += w + font.measure(" ")
 
@@ -204,9 +210,9 @@ class InlineLayout(LayoutObject):
         assert len(self.line) == len(self.font_metrics), "{} != {}".format(
             len(self.line), len(self.font_metrics)
         )
-        for (x, word, font), metric in zip(self.line, self.font_metrics):
+        for (x, word, font, color), metric in zip(self.line, self.font_metrics):
             y = int(baseline - metric["ascent"])
-            self.display_list.append((x, y, word, font))
+            self.display_list.append((x, y, word, font, color))
 
         self.cursor_x = self.x
         max_descent = max([metric["descent"] for metric in self.font_metrics])
@@ -218,15 +224,14 @@ class InlineLayout(LayoutObject):
     def paint(self, display_list: List[Draw]) -> None:
         bgcolor = self.node.style.get("background-color", "transparent")
         if bgcolor != "transparent":
-            print("bg_color_paint", bgcolor)
             x2, y2 = self.x + self.width, self.y + self.height
             display_list.append(DrawRect(self.x, self.y, x2, y2, bgcolor))
         # if isinstance(self.node, Element) and self.node.tag == "pre":
         #     x2, y2 = self.x + self.width, self.y + self.height
         #     display_list.append(DrawRect(self.x, self.y, x2, y2, "gray"))
         assert isinstance(self.display_list, list)
-        for x, y, word, font in self.display_list:
-            display_list.append(DrawText(x, y, word, font))
+        for x, y, word, font, color in self.display_list:
+            display_list.append(DrawText(x, y, word, font, color))
 
     def __repr__(self) -> str:
         return "InlineLayout(x={}, y={}, width={}, height={}, node={})".format(
