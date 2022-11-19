@@ -40,9 +40,9 @@ class Browser:
     def load(self, url: str):
         _, body, _ = request(url)
         self.nodes = HTMLParser(body).parse()
+        style(self.nodes)
         self.document = DocumentLayout(self.nodes)
         self.document.layout()
-        style(self.nodes)
         self.display_list: List[Draw] = []
         self.document.paint(self.display_list)
         self.draw()

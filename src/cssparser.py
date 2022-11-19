@@ -1,5 +1,6 @@
 from typing import Dict, Tuple
 from src.layout import Element, HTMLNode
+from src.selector import TagSelector, DesendantSelector
 
 
 def style(node: HTMLNode):
@@ -54,7 +55,7 @@ class CSSParser:
 
     def body(self) -> Dict[str, str]:
         pairs: Dict[str, str] = {}
-        while self.i < len(self.s):
+        while self.i < len(self.s) and self.s[self.i] != "}":
             try:
                 prop, val = self.pair()
                 pairs[prop] = val
@@ -62,7 +63,7 @@ class CSSParser:
                 self.literal(";")
                 self.whitespace()
             except AssertionError:
-                why = self.ignore_until([";"])
+                why = self.ignore_until([";", "}"])
                 if why == ";":
                     self.literal(";")
                     self.whitespace()
@@ -70,3 +71,33 @@ class CSSParser:
                     break
 
         return pairs
+
+    def selector(self):
+        out = TagSelector(self.word().lower())
+        self.whitespace()
+        while self.i < len(self.s) and self.s[self.i] != "{":
+            tag = self.word()
+            desendant = TagSelector(tag.lower())
+            out = DesendantSelector(out, desendant)
+            self.whitespace()
+        return out
+
+    def parse(self):
+        rules = []
+        while self.i < len(self.s):
+            try:
+                self.whitespace()
+                selector = self.selector()
+                self.literal("{")
+                self.whitespace()
+                body = self.body()
+                self.literal("}")
+                rules.append((selector, body))
+            except AssertionError:
+                why = self.ignore_until(["}"])
+                if why == "}":
+                    self.literal("}")
+                    self.whitespace()
+                else:
+                    break
+        return rules
