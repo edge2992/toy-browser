@@ -8,6 +8,9 @@ class TagSelector:
     def matches(self, node):
         return isinstance(node, Element) and self.tag == node.tag
 
+    def __repr__(self) -> str:
+        return f"TagSelector({self.tag})"
+
 
 class DesendantSelector:
     def __init__(self, ancestor, descendant):
@@ -22,3 +25,8 @@ class DesendantSelector:
                 return True
             node = node.parent
         return False
+
+    def __repr__(self) -> str:
+        return (
+            f"DesendantSelector(ancestor={self.ancestor}, descendant={self.descendant})"
+        )
