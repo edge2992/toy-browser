@@ -1,3 +1,4 @@
+from __future__ import annotations
 import tkinter
 import tkinter.font
 import sys
@@ -27,7 +28,8 @@ class Tab:
 
     def load(self, url: str):
         self.history.append(url)
-        _, body, _ = request(url)
+        header, body, _ = request(url)
+        print("header\n", header)
         self.scroll = 0
         self.url = url
         self.nodes = HTMLParser(body).parse()
@@ -77,6 +79,7 @@ class Tab:
                 pass
             elif isinstance(elt, Element) and "href" in elt.attributes:
                 url = resolve_url(elt.attributes["href"], self.url)
+                print("tab click", url)
                 return self.load(url)
 
             elt = elt.parent
@@ -100,19 +103,16 @@ class Tab:
 
 class Browser:
     def __init__(self):
-        self.scroll = 0
-        self.min_scroll = 0
-        self.max_scroll = 0
-        self.font = 12
         self.width = WIDTH
         self.height = HEIGHT
         self.hstep = HSTEP
         self.vstep = VSTEP
-        self.url: Union[str, None] = None
         self.window = tkinter.Tk()
         self.window.bind("<Down>", self.handle_down)
         self.window.bind("<Up>", self.handle_up)
         self.window.bind("<Button-1>", self.handle_click)
+        self.window.bind("<Key>", self.handle_key)
+        self.window.bind("<Enter>", self.handle_return)
         # self.window.bind("<Button-5>", self.scrolldown)
         # self.window.bind("<Button-4>", self.scrollup)
         # self.window.bind("<Right>", self.fontup)
@@ -126,8 +126,11 @@ class Browser:
         self.canvas.pack(fill=tkinter.BOTH, expand=True)
         with open("src/browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
-        self.tabs = []
-        self.active_tab = None
+
+        self.tabs: List[Tab] = []
+        self.active_tab: Union[None, int] = None
+        self.forcus = None
+        self.address_bar = ""
 
     def load(self, url: str):
         new_tab = Tab()
@@ -172,19 +175,62 @@ class Browser:
         self.canvas.create_rectangle(10, 50, 35, 90, outline="black", width=1)
         self.canvas.create_polygon(16, 70, 30, 55, 30, 85, fill="black")
 
+        # アドレスバー
+        if self.forcus == "address bar":
+            self.canvas.create_text(
+                55,
+                55,
+                anchor="nw",
+                text=self.address_bar,
+                font=buttonfont,
+                fill="black",
+            )
+            w = buttonfont.measure(self.address_bar)
+            self.canvas.create_line(55 + w, 55, 55 + w, 90, fill="black")
+        else:
+            url = self.tabs[self.active_tab].url
+            self.canvas.create_text(
+                55, 55, anchor="nw", text=url, font=buttonfont, fill="black"
+            )
+
     def handle_click(self, e: tkinter.Event):
+        self.forcus = None
         if e.y < CHROME_PX:
             if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
+                print("active tab click", e.x, e.y)
                 self.active_tab = (e.x - 40) // 80
-            elif 10 <= e.x < 30 and 10 <= e.y < 30:
+            elif 10 <= e.x < 35 and 10 <= e.y < 30:
+                print("new tab click", e.x, e.y)
                 self.load("https://browser.engineering/")
             elif 10 <= e.x < 35 and 40 <= e.y < 90:
+                print("back click", e.x, e.y)
                 assert self.active_tab is not None
                 self.tabs[self.active_tab].go_back()
+            elif 50 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
+                print("address bar click", e.x, e.y)
+                self.forcus = "address_bar"
+                self.address_bar = ""
         else:
             assert self.active_tab is not None
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
         self.draw()
+
+    def handle_key(self, e: tkinter.Event):
+        if len(e.char) == 0:
+            return
+        if not (0x20 <= ord(e.char) < 0x7F):
+            return
+
+        if self.forcus == "address bar":
+            self.address_bar += e.char
+            self.draw()
+
+    def handle_return(self, e: tkinter.Event):
+        if self.forcus == "address bar":
+            assert self.active_tab is not None
+            self.tabs[self.active_tab].load(self.address_bar)
+            self.forcus = None
+            self.draw()
 
     def handle_down(self, e: tkinter.Event):
         assert self.active_tab is not None
