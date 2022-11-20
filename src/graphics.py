@@ -62,7 +62,7 @@ class Tab:
             self.nodes, width=self.width, font_ratio=self.font_ratio
         )
         self.document.layout()
-        self.display_list: List[Draw] = []
+        self.display_list: List[Draw] = []  # type: ignore
         self.document.paint(self.display_list)
 
     def draw(self, canvas: tkinter.Canvas):
@@ -134,6 +134,11 @@ class Browser:
         self.height = HEIGHT
         self.hstep = HSTEP
         self.vstep = VSTEP
+        self.tabs: List[Tab] = []  # type: ignore
+        self.active_tab: Union[None, int] = None  # type: ignore
+        self.forcus = None
+        self.address_bar = ""
+
         self.window = tkinter.Tk()
         self.window.bind("<Down>", self.handle_down)
         self.window.bind("<Up>", self.handle_up)
@@ -153,11 +158,6 @@ class Browser:
         self.canvas.pack(fill=tkinter.BOTH, expand=True)
         with open("src/browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
-
-        self.tabs: List[Tab] = []
-        self.active_tab: Union[None, int] = None
-        self.forcus = None
-        self.address_bar = ""
 
     def load(self, url: str):
         print("browser load")

@@ -8,7 +8,7 @@ def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[s
     if max_redirs == 0:
         raise Exception("Too many redirects")
 
-    option = []
+    option: List[str] = []
     scheme, url = url.split(":", 1)
 
     assert scheme in [
@@ -44,8 +44,8 @@ def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[s
 
     # example: http://example.org:8080/foo/bar
     if ":" in host:
-        host, port = host.split(":", 1)
-        port = int(port)
+        host, port_str = host.split(":", 1)
+        port = int(port_str)
 
     with socket.socket(
         family=socket.AF_INET, type=socket.SOCK_STREAM, proto=socket.IPPROTO_TCP

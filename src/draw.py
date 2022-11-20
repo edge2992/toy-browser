@@ -3,24 +3,24 @@ import tkinter
 
 
 class Draw:
-    def __init__(self):
-        self.top: int
-        self.left: int
-        self.right: int
-        self.bottom: int
+    def __init__(self, top: int, left: int, right: int, bottom: int, color: str):
+        self.top: int = top
+        self.left: int = left
+        self.right: int = right
+        self.bottom: int = bottom
+        self.color: str = color
 
     def execute(self, scroll: int, canvas: tkinter.Canvas):
         raise NotImplementedError
 
 
 class DrawText(Draw):
-    def __init__(self, x1, y1, text, font, color):
-        self.top = y1
-        self.left = x1
+    def __init__(
+        self, x1: int, y1: int, text: str, font: tkinter.font.Font, color: str
+    ):
+        super().__init__(y1, x1, x1, y1 + font.metrics("linespace"), color)
         self.text = text
         self.font = font
-        self.bottom = y1 + font.metrics("linespace")
-        self.color = color
 
     def execute(self, scroll, canvas):
         canvas.create_text(
@@ -37,12 +37,8 @@ class DrawText(Draw):
 
 
 class DrawRect(Draw):
-    def __init__(self, x1, y1, x2, y2, color):
-        self.top = y1
-        self.left = x1
-        self.right = x2
-        self.bottom = y2
-        self.color = color
+    def __init__(self, x1: int, y1: int, x2: int, y2: int, color: str):
+        super().__init__(y1, x1, x2, y2, color)
 
     def execute(self, scroll, canvas):
         canvas.create_rectangle(
