@@ -9,6 +9,7 @@ WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
 FONTS: Dict[Tuple[int, str, str], tkinter.font.Font] = {}  # font cache
 FONT_METRICS: Dict[Tuple[int, str, str], dict] = {}
+FONT_RATIO: float = 0.75
 
 
 def get_font(size: int, weight: str, slant: str) -> tkinter.font.Font:
@@ -91,6 +92,7 @@ class LayoutObject(Generic[PN, PRN, CN]):
         node: HTMLNode,
         parent: PN,
         previous: PRN,
+        font_ratio: float = FONT_RATIO,
     ):
         self.node: HTMLNode = node
         self.parent = parent
@@ -100,6 +102,7 @@ class LayoutObject(Generic[PN, PRN, CN]):
         self.y: int
         self.width: int
         self.height: int
+        self.font_ratio = font_ratio
 
     def layout(self):
         """レイアウトツリーを作成する"""
@@ -112,9 +115,13 @@ class LayoutObject(Generic[PN, PRN, CN]):
 
 class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutObject]):
     def __init__(
-        self, node: HTMLNode, parent: LayoutObject, previous: Union[LayoutObject, None]
+        self,
+        node: HTMLNode,
+        parent: LayoutObject,
+        previous: Union[LayoutObject, None],
+        font_ratio: float = FONT_RATIO,
     ):
-        super().__init__(node, parent, previous)
+        super().__init__(node, parent, previous, font_ratio)
         self.font_metrics: List[dict] = []
         self.previous_word: Union[TextLayout, None] = None
 
@@ -153,7 +160,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutO
 
         if style == "normal":
             style = "roman"
-        size = int(float(node.style["font-size"][:-2]) * 0.75)
+        size = int(float(node.style["font-size"][:-2]) * self.font_ratio)
         font = get_font(size, weight, style)
         for word in node.text.split():
             w = font.measure(word)
@@ -161,7 +168,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutO
                 self.new_line()
             line = self.children[-1]
             assert isinstance(line, LineLayout)
-            text = TextLayout(node, word, line, self.previous_word)
+            text = TextLayout(node, word, line, self.previous_word, self.font_ratio)
             line.children.append(text)
             self.previous_word = text
             self.cursor_x += w + font.measure(" ")
@@ -170,7 +177,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutO
         self.previous_word = None
         self.cursor_x = self.x
         last_line = self.children[-1] if self.children else None
-        new_line = LineLayout(self.node, self, last_line)
+        new_line = LineLayout(self.node, self, last_line, self.font_ratio)
         self.children.append(new_line)
 
     def paint(self, display_list: List[Draw]) -> None:
@@ -193,8 +200,9 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
         node: HTMLNode,
         parent: LayoutObject,
         previous: Union[LayoutObject, None],
+        font_ratio: float = FONT_RATIO,
     ):
-        super().__init__(node, parent, previous)
+        super().__init__(node, parent, previous, font_ratio)
 
     def layout(self) -> None:
         previous: Union[InlineLayout, BlockLayout, None] = None
@@ -202,9 +210,9 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
         for child in self.node.children:
             next: Union[InlineLayout, BlockLayout]
             if layout_mode(child) == "inline":
-                next = InlineLayout(child, self, previous)
+                next = InlineLayout(child, self, previous, self.font_ratio)
             else:
-                next = BlockLayout(child, self, previous)
+                next = BlockLayout(child, self, previous, self.font_ratio)
             self.children.append(next)
             previous = next
         # width, x, yをparentとpreviousを参考に計算する
@@ -237,6 +245,7 @@ class DocumentLayout(LayoutObject):
         width: int = WIDTH - 2 * HSTEP,
         hstep: int = HSTEP,
         vstep: int = VSTEP,
+        font_ratio: float = FONT_RATIO,
     ):
         self.node = node
         self.parent: Union[LayoutObject, None] = None
@@ -245,9 +254,10 @@ class DocumentLayout(LayoutObject):
         self.height: int
         self.x = hstep
         self.y = vstep
+        self.font_ratio = font_ratio
 
     def layout(self) -> None:
-        child = BlockLayout(self.node, self, None)
+        child = BlockLayout(self.node, self, None, self.font_ratio)
         self.children.append(child)
         child.layout()
         self.height = child.height + 2 * VSTEP
@@ -265,8 +275,9 @@ class LineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "TextLayo
         node: HTMLNode,
         parent: LayoutObject,
         previous: Union[LayoutObject, None],
+        font_ratio: float = FONT_RATIO,
     ):
-        super().__init__(node, parent, previous)
+        super().__init__(node, parent, previous, font_ratio)
 
     def layout(self):
         self.width = self.parent.width
@@ -306,8 +317,9 @@ class TextLayout(LayoutObject[LineLayout, Union["TextLayout", None], LayoutObjec
         word: str,
         parent: LineLayout,
         previous: Union[TextLayout, None],
+        font_ratio: float = FONT_RATIO,
     ):
-        super().__init__(node, parent, previous)
+        super().__init__(node, parent, previous, font_ratio)
         self.word = word
         self.font: tkinter.font.Font
 
@@ -316,7 +328,7 @@ class TextLayout(LayoutObject[LineLayout, Union["TextLayout", None], LayoutObjec
         style = self.node.style["font-style"]
         if style == "normal":
             style = "roman"
-        size = int(float(self.node.style["font-size"][:-2]) * 0.75)
+        size = int(float(self.node.style["font-size"][:-2]) * self.font_ratio)
         self.font = get_font(size, weight, style)
         self.width = self.font.measure(self.word)
         if self.previous:

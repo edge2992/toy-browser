@@ -17,6 +17,7 @@ WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
 SCROLL_STEP = 100
 CHROME_PX = 100
+FONT_RATIO: float = 0.75
 
 
 class Tab:
@@ -27,6 +28,7 @@ class Tab:
         self.history: List[str] = []
         self.width = width
         self.height = height
+        self.font_ratio = FONT_RATIO
 
     def load(self, url: str):
         self.history.append(url)
@@ -52,8 +54,13 @@ class Tab:
                 continue
             rules.extend(CSSParser(body).parse())
         style(self.nodes, sorted(rules, key=cascade_priority))
+        self._layout()
 
-        self.document = DocumentLayout(self.nodes, width=self.width)
+    def _layout(self):
+        # layout -> paint
+        self.document = DocumentLayout(
+            self.nodes, width=self.width, font_ratio=self.font_ratio
+        )
         self.document.layout()
         self.display_list: List[Draw] = []
         self.document.paint(self.display_list)
@@ -99,14 +106,20 @@ class Tab:
         self.scroll -= SCROLL_STEP
         self.scroll = max(self.scroll, 0)
 
+    def fontup(self):
+        self.font_ratio += 0.1
+        self._layout()
+
+    def fontdown(self):
+        self.font_ratio -= 0.1
+        self._layout()
+
     def resize(self, width, height):
         print("resizing tag...", width, height)
         if self.width != width:
             # widthを変更した場合には再レイアウトが必要
-            self.document = DocumentLayout(self.nodes, width=width)
-            self.document.layout()
-            self.display_list = []
-            self.document.paint(self.display_list)
+            self.width = width
+            self._layout()
 
         self.height = height
         self.width = width
@@ -124,6 +137,8 @@ class Browser:
         self.window = tkinter.Tk()
         self.window.bind("<Down>", self.handle_down)
         self.window.bind("<Up>", self.handle_up)
+        self.window.bind("<Right>", self.handle_fontup)
+        self.window.bind("<Left>", self.handle_fontdown)
         self.window.bind("<MouseWheel>", self.handle_scroll)
         self.window.bind("<Button-1>", self.handle_click)
         self.window.bind("<Key>", self.handle_key)
@@ -132,8 +147,6 @@ class Browser:
         # For Linux
         # self.window.bind("<Button-5>", self.scrolldown)
         # self.window.bind("<Button-4>", self.scrollup)
-        # self.window.bind("<Right>", self.fontup)
-        # self.window.bind("<Left>", self.fontdown)
         self.canvas = tkinter.Canvas(
             self.window, width=self.width, height=self.height, bg="white"
         )
@@ -284,27 +297,17 @@ class Browser:
                 tab.resize(self.width, self.height)
             self.draw()
 
-    # def fontup(self, e: tkinter.Event):
-    #     # TODO: Layoutクラスにhstepとvstepを渡す
-    #     self.font = self.font + 1
-    #     self.hstep += 2
-    #     self.vstep += 2
-    #     print("fontup")
-    #     self.document.layout()
-    #     self.display_list = []
-    #     self.document.paint(self.display_list)
-    #     self.draw()
+    def handle_fontup(self, e: tkinter.Event):
+        print("fontup")
+        assert self.active_tab is not None
+        self.tabs[self.active_tab].fontup()
+        self.draw()
 
-    # def fontdown(self, e: tkinter.Event):
-    #     # TODO: Layoutクラスにhstepとvstepを渡す
-    #     self.font = self.font - 1
-    #     self.hstep -= 2
-    #     self.vstep -= 2
-    #     print("fontdown")
-    #     self.document.layout()
-    #     self.display_list = []
-    #     self.document.paint(self.display_list)
-    #     self.draw()
+    def handle_fontdown(self, e: tkinter.Event):
+        print("fontdown")
+        assert self.active_tab is not None
+        self.tabs[self.active_tab].fontdown()
+        self.draw()
 
 
 if __name__ == "__main__":
