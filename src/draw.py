@@ -21,8 +21,6 @@ class DrawText(Draw):
         self.font = font
         self.bottom = y1 + font.metrics("linespace")
         self.color = color
-        if color != "#333":
-            print(color)
 
     def execute(self, scroll, canvas):
         canvas.create_text(
