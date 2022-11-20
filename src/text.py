@@ -1,22 +1,32 @@
-from typing import Tuple, Union
+from __future__ import annotations
+from abc import ABC
+from typing import Dict, Tuple, Union, List
 
 
-class Text:
+class HTMLNode(ABC):
+    parent: Union[HTMLNode, None]
+    children: List[HTMLNode]
+    style: Dict[str, str] = {}
+
+
+class Text(HTMLNode):
     def __init__(self, text: str, parent):
         self.text = text
         self.children = []
         self.parent = parent
+        # self.style = {}
 
     def __repr__(self):
         return repr(self.text)
 
 
-class Element:
+class Element(HTMLNode):
     def __init__(self, tag: str, attributes: dict, parent):
         self.tag = tag
         self.attributes = attributes
         self.children = []
         self.parent = parent
+        # self.style = {}
 
     def __repr__(self):
         return "<" + self.tag + ">"
@@ -55,7 +65,7 @@ class HTMLParser:
 
     def __init__(self, body: str):
         self.body = body
-        self.unfinished = []
+        self.unfinished: List[Element] = []
 
     def implicit_tags(self, tag: Union[str, None]) -> None:
         while True:
@@ -87,11 +97,16 @@ class HTMLParser:
         if tag.startswith("!"):
             return  # doctype
         self.implicit_tags(tag)
+        parent: Union[Element, None]
         if tag.startswith("/"):
-            if len(self.unfinished) == 0:
+            if len(self.unfinished) == 1:
                 return
             node = self.unfinished.pop()
             parent = self.unfinished[-1]
+            parent.children.append(node)
+        elif tag in SELF_CLOSING_TAGS:
+            parent = self.unfinished[-1]
+            node = Element(tag, attributes, parent)
             parent.children.append(node)
         else:
             parent = self.unfinished[-1] if self.unfinished else None
@@ -139,9 +154,6 @@ class HTMLParser:
             else:
                 attributes[attrpair.lower()] = ""
         return tag, attributes
-
-
-HTMLNode = Union[Element, Text]
 
 
 def print_tree(node, indent: int = 0):
