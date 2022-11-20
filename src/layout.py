@@ -68,6 +68,8 @@ BLOCK_ELEMENTS = [
 
 
 def layout_mode(node: HTMLNode) -> str:
+    if isinstance(node, Element) and node.tag == "head":
+        return "head"
     if isinstance(node, Text):
         return "inline"
     elif node.children:
@@ -209,10 +211,14 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
         # create child layout object
         for child in self.node.children:
             next: Union[InlineLayout, BlockLayout]
-            if layout_mode(child) == "inline":
+            mode = layout_mode(child)
+            if mode == "inline":
                 next = InlineLayout(child, self, previous, self.font_ratio)
-            else:
+            elif mode == "block":
                 next = BlockLayout(child, self, previous, self.font_ratio)
+            else:
+                # headを飛ばす
+                continue
             self.children.append(next)
             previous = next
         # width, x, yをparentとpreviousを参考に計算する

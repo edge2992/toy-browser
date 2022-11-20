@@ -69,6 +69,7 @@ def test_layout_mode2():
 
 
 def test_layout_tree_head(example_org_body, sorted_default_rules):
+    print()
     from src.text import HTMLParser, print_tree
     from src.layout import DocumentLayout
     from src.cssparser import style
@@ -81,7 +82,6 @@ def test_layout_tree_head(example_org_body, sorted_default_rules):
     # print_tree(nodes)
     document = DocumentLayout(nodes)
     document.layout()
-    child = document.children[0]
-    assert str(child.node) == "<html>"
-    assert str(child.children[0].node) == "<head>"
+    body = document.children[0].children[0]
+    assert body.node.tag == "body"
     print_tree(document)
