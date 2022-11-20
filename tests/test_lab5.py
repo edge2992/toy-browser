@@ -34,6 +34,7 @@ def test_bigger_parser():
 def test_layout_tree(mocker):
     from src.graphics import Browser
     from src.text import print_tree
+    from src.layout import BlockLayout
 
     sample_html = "<div></div><div>text</div><div><div></div>text</div><span></span><span>text</span>"
     url = "http://test.test/example1"
@@ -42,9 +43,13 @@ def test_layout_tree(mocker):
     ):
         browser = Browser()
         browser.load(url)
-        print_tree(browser.nodes)
-        print_tree(browser.document)
-        print(browser.display_list)
+        print_tree(browser.tabs[0].nodes)
+        print_tree(browser.tabs[0].document)
+        print(browser.tabs[0].display_list)
+        body_layout = browser.tabs[0].document.children[0].children[0]
+        assert isinstance(body_layout, BlockLayout)
+        assert str(body_layout.node) == "<body>"
+        assert len(body_layout.children) == 5
 
 
 def test_layout_mode2():
@@ -63,22 +68,20 @@ def test_layout_mode2():
     assert layout_mode(document_tree.children[0].children[4]) == "inline"
 
 
-def test_layout_tree_head(example_org_body):
+def test_layout_tree_head(example_org_body, sorted_default_rules):
     from src.text import HTMLParser, print_tree
     from src.layout import DocumentLayout
+    from src.cssparser import style
     import tkinter
 
     # dummy tkinter canvas
     _ = tkinter.Canvas(tkinter.Tk(), width=800, height=600)
     nodes = HTMLParser(example_org_body).parse()
-    print_tree(nodes)
+    style(nodes, sorted_default_rules)
+    # print_tree(nodes)
     document = DocumentLayout(nodes)
     document.layout()
-    for child in document.children:
-        print(child)
-        print("\t", child.children)
-        print("\t\t", child.children[0].children)
-        assert str(child.node) == "<html>"
-        assert str(child.children[0].node) == "<head>"
-        assert len(child.children[0].children) == 0
+    child = document.children[0]
+    assert str(child.node) == "<html>"
+    assert str(child.children[0].node) == "<head>"
     print_tree(document)
