@@ -63,22 +63,20 @@ def test_layout_mode2():
     assert layout_mode(document_tree.children[0].children[4]) == "inline"
 
 
-def test_layout_tree_head(example_org_body):
+def test_layout_tree_head(example_org_body, sorted_default_rules):
     from src.text import HTMLParser, print_tree
     from src.layout import DocumentLayout
+    from src.cssparser import style
     import tkinter
 
     # dummy tkinter canvas
     _ = tkinter.Canvas(tkinter.Tk(), width=800, height=600)
     nodes = HTMLParser(example_org_body).parse()
-    print_tree(nodes)
+    style(nodes, sorted_default_rules)
+    # print_tree(nodes)
     document = DocumentLayout(nodes)
     document.layout()
-    for child in document.children:
-        print(child)
-        print("\t", child.children)
-        print("\t\t", child.children[0].children)
-        assert str(child.node) == "<html>"
-        assert str(child.children[0].node) == "<head>"
-        assert len(child.children[0].children) == 0
+    child = document.children[0]
+    assert str(child.node) == "<html>"
+    assert str(child.children[0].node) == "<head>"
     print_tree(document)

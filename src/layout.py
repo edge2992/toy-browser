@@ -112,9 +112,8 @@ class InlineLayout(LayoutObject):
     ):
         super().__init__(node, parent, previous)
         self.parent: LayoutObject = parent
-        self.display_list: List[Tuple[int, int, str, tkinter.font.Font, str]] = []
         self.font_metrics: List[dict] = []
-        self.line: List[Tuple[int, str, tkinter.font.Font, str]] = []
+        self.previous_word: Union[TextLayout, None] = None
 
     def layout(self):
         self.width = self.parent.width
@@ -125,20 +124,20 @@ class InlineLayout(LayoutObject):
         else:
             self.y = self.parent.y
 
-        self.cursor_x = self.x
-        self.cursor_y = self.y
-
+        self.new_line()
         self.recurse(self.node)
-        self.flush()
 
-        self.height = self.cursor_y - self.y
+        for line in self.children:
+            line.layout()
+
+        self.height = sum([line.height for line in self.children])
 
     def recurse(self, node: HTMLNode):
         if isinstance(node, Text):
             self.text(node)
         elif isinstance(node, Element):
             if node.tag == "br":
-                self.flush()
+                self.new_line()
             for child in node.children:
                 self.recurse(child)
         else:
@@ -148,48 +147,36 @@ class InlineLayout(LayoutObject):
         # English
         weight = node.style["font-weight"]
         style = node.style["font-style"]
-        color = node.style["color"]
+
         if style == "normal":
             style = "roman"
         size = int(float(node.style["font-size"][:-2]) * 0.75)
         font = get_font(size, weight, style)
-        metric = get_font_metric(size, weight, style)
         for word in node.text.split():
             w = font.measure(word)
             if self.cursor_x + w > self.width - HSTEP:
-                self.flush()
-            self.line.append((self.cursor_x, word, font, color))
-            self.font_metrics.append(metric)
+                self.new_line()
+            line = self.children[-1]
+            assert isinstance(line, LineLayout)
+            text = TextLayout(node, word, line, self.previous_word)
+            line.children.append(text)
+            self.previous_word = text
             self.cursor_x += w + font.measure(" ")
 
-    def flush(self) -> None:
-        if not self.line:
-            return
-
-        max_ascent = max([metric["ascent"] for metric in self.font_metrics])
-        baseline = self.cursor_y + 1.25 * max_ascent
-        assert len(self.line) == len(self.font_metrics), "{} != {}".format(
-            len(self.line), len(self.font_metrics)
-        )
-        for (x, word, font, color), metric in zip(self.line, self.font_metrics):
-            y = int(baseline - metric["ascent"])
-            self.display_list.append((x, y, word, font, color))
-
+    def new_line(self):
+        self.previous_word = None
         self.cursor_x = self.x
-        max_descent = max([metric["descent"] for metric in self.font_metrics])
-        self.line = []
-        self.font_metrics = []
-        # self.cursor_x = HSTEP
-        self.cursor_y = baseline + 1.25 * max_descent
+        last_line = self.children[-1] if self.children else None
+        new_line = LineLayout(self.node, self, last_line)
+        self.children.append(new_line)
 
     def paint(self, display_list: List[Draw]) -> None:
         bgcolor = self.node.style.get("background-color", "transparent")
         if bgcolor != "transparent":
             x2, y2 = self.x + self.width, self.y + self.height
             display_list.append(DrawRect(self.x, self.y, x2, y2, bgcolor))
-        assert isinstance(self.display_list, list)
-        for x, y, word, font, color in self.display_list:
-            display_list.append(DrawText(x, y, word, font, color))
+        for child in self.children:
+            child.paint(display_list)
 
     def __repr__(self) -> str:
         return "InlineLayout(x={}, y={}, width={}, height={}, node={})".format(
@@ -261,3 +248,85 @@ class DocumentLayout(LayoutObject):
 
     def __repr__(self):
         return "DocumentLayout()"
+
+
+class LineLayout(LayoutObject):
+    def __init__(
+        self,
+        node: HTMLNode,
+        parent: LayoutObject,
+        previous: Union[LayoutObject, None],
+    ):
+        super().__init__(node, parent, previous)
+        self.children: List[TextLayout] = []
+        self.parent: LayoutObject = parent
+
+    def layout(self):
+        self.width = self.parent.width
+        self.x = self.parent.x
+
+        if self.previous:
+            self.y = self.previous.y + self.previous.height
+        else:
+            self.y = self.parent.y
+
+        for word in self.children:
+            word.layout()
+
+        max_ascent = max(word.font.metrics("ascent") for word in self.children)
+
+        baseline = self.y + 1.25 * max_ascent
+        for word in self.children:
+            word.y = int(baseline - word.font.metrics("ascent"))
+
+        max_descent = max([word.font.metrics("descent") for word in self.children])
+        self.height = int(1.25 * (max_ascent + max_descent))
+
+    def paint(self, display_list: List[Draw]) -> None:
+        for child in self.children:
+            child.paint(display_list)
+
+    def __repr__(self):
+        return "LineLayout(x={}, y={}, width={}, height={})".format(
+            self.x, self.y, self.width, self.height
+        )
+
+
+class TextLayout(LayoutObject):
+    def __init__(
+        self,
+        node: HTMLNode,
+        word: str,
+        parent: LineLayout,
+        previous: Union[TextLayout, None],
+    ):
+        super().__init__(node, parent, previous)
+        self.word = word
+        self.parent: LineLayout = parent
+        self.previous: Union[TextLayout, None] = previous
+        self.font: tkinter.font.Font
+
+    def layout(self):
+        weight = self.node.style["font-weight"]
+        style = self.node.style["font-style"]
+        if style == "normal":
+            style = "roman"
+        size = int(float(self.node.style["font-size"][:-2]) * 0.75)
+        self.font = get_font(size, weight, style)
+        self.width = self.font.measure(self.word)
+        if self.previous:
+            space = self.previous.font.measure(" ")
+            self.x = self.previous.x + space + self.previous.width
+        else:
+            self.x = self.parent.x
+
+        self.height = self.font.metrics("linespace")
+
+    def paint(self, display_list: List[Draw]) -> None:
+        color = self.node.style["color"]
+        display_list.append(DrawText(self.x, self.y, self.word, self.font, color))
+
+    def __repr__(self) -> str:
+        return ("TextLayout(x={}, y={}, width={}, height={}, node={}, word={})").format(
+            self.x, self.y, self.width, self.height, self.node, self.word
+        )

@@ -46,16 +46,12 @@ def test_htmlParser6():
     print_tree(parser.parse())
 
 
-def test_layout():
-    from src.text import HTMLParser
-    from src.layout import DocumentLayout
-    import tkinter
+def test_layout(mocker):
+    from src.graphics import Browser
 
-    _ = tkinter.Canvas(tkinter.Tk(), width=800, height=600)
-    parser = HTMLParser("<p>text</p>")
-    tree = parser.parse()
-    document = DocumentLayout(tree)
-    document.layout()
-    display_list = []
-    document.paint(display_list)
-    print(display_list)
+    with mocker.patch(
+        "src.browser._get_headers_and_body", return_value=("", "<p>text</p>")
+    ):
+        browser = Browser()
+        browser.load("http://test.test/example1")
+        print(browser.display_list)
