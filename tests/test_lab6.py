@@ -130,10 +130,10 @@ def test_priority(mocker):
     ):
         browser = Browser()
         browser.load("http://bar.com/")
-        assert (
-            browser.document.children[0].children[0].children[0].node.style["color"]
-            == "blue"
-        )
+        body_layout = browser.tabs[0].document.children[0].children[0]
+        div_layout = body_layout.children[0]
+        assert str(div_layout.node) == "<div>"
+        assert div_layout.node.style["color"] == "blue"
 
 
 def test_resolve_url():
