@@ -1,7 +1,7 @@
 from __future__ import annotations
 import tkinter
 import tkinter.font
-from typing import Dict, List, Tuple, Union
+from typing import Dict, Generic, List, Tuple, TypeVar, Union
 from src.draw import Draw, DrawRect, DrawText
 from src.text import Element, HTMLNode, Text
 
@@ -80,17 +80,22 @@ def layout_mode(node: HTMLNode) -> str:
         return "block"
 
 
-class LayoutObject:
+PN = TypeVar("PN", bound=Union["LayoutObject", None])  # parent layout node
+PRN = TypeVar("PRN", bound=Union["LayoutObject", None])  # previous layout node
+CN = TypeVar("CN", bound="LayoutObject")  # child layout node
+
+
+class LayoutObject(Generic[PN, PRN, CN]):
     def __init__(
         self,
         node: HTMLNode,
-        parent: LayoutObject,
-        previous: Union[LayoutObject, None],
+        parent: PN,
+        previous: PRN,
     ):
         self.node: HTMLNode = node
-        self.parent: Union[LayoutObject, None] = parent
+        self.parent = parent
         self.previous = previous
-        self.children: List[LayoutObject] = []
+        self.children: List[CN] = []
         self.x: int
         self.y: int
         self.width: int
@@ -103,15 +108,11 @@ class LayoutObject:
         raise NotImplementedError
 
 
-class InlineLayout(LayoutObject):
+class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutObject]):
     def __init__(
-        self,
-        node: HTMLNode,
-        parent: LayoutObject,
-        previous: Union[LayoutObject, None],
+        self, node: HTMLNode, parent: LayoutObject, previous: Union[LayoutObject, None]
     ):
         super().__init__(node, parent, previous)
-        self.parent: LayoutObject = parent
         self.font_metrics: List[dict] = []
         self.previous_word: Union[TextLayout, None] = None
 
@@ -184,7 +185,7 @@ class InlineLayout(LayoutObject):
         )
 
 
-class BlockLayout(LayoutObject):
+class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutObject]):
     def __init__(
         self,
         node: HTMLNode,
@@ -192,13 +193,12 @@ class BlockLayout(LayoutObject):
         previous: Union[LayoutObject, None],
     ):
         super().__init__(node, parent, previous)
-        self.parent: LayoutObject = parent
 
     def layout(self) -> None:
-        previous = None
+        previous: Union[InlineLayout, BlockLayout, None] = None
         # create child layout object
         for child in self.node.children:
-            next: LayoutObject
+            next: Union[InlineLayout, BlockLayout]
             if layout_mode(child) == "inline":
                 next = InlineLayout(child, self, previous)
             else:
@@ -250,7 +250,7 @@ class DocumentLayout(LayoutObject):
         return "DocumentLayout()"
 
 
-class LineLayout(LayoutObject):
+class LineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "TextLayout"]):
     def __init__(
         self,
         node: HTMLNode,
@@ -258,8 +258,6 @@ class LineLayout(LayoutObject):
         previous: Union[LayoutObject, None],
     ):
         super().__init__(node, parent, previous)
-        self.children: List[TextLayout] = []
-        self.parent: LayoutObject = parent
 
     def layout(self):
         self.width = self.parent.width
@@ -292,7 +290,7 @@ class LineLayout(LayoutObject):
         )
 
 
-class TextLayout(LayoutObject):
+class TextLayout(LayoutObject[LineLayout, Union["TextLayout", None], LayoutObject]):
     def __init__(
         self,
         node: HTMLNode,
@@ -302,8 +300,6 @@ class TextLayout(LayoutObject):
     ):
         super().__init__(node, parent, previous)
         self.word = word
-        self.parent: LineLayout = parent
-        self.previous: Union[TextLayout, None] = previous
         self.font: tkinter.font.Font
 
     def layout(self):
