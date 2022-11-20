@@ -23,8 +23,10 @@ class Tab:
         self.scroll = 0
         with open("src/browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
+        self.history: List[str] = []
 
     def load(self, url: str):
+        self.history.append(url)
         _, body, _ = request(url)
         self.scroll = 0
         self.url = url
@@ -79,13 +81,18 @@ class Tab:
 
             elt = elt.parent
 
+    def go_back(self):
+        if len(self.history) > 1:
+            self.history.pop()
+            self.load(self.history.pop())
+
     def scrolldown(self):
         max_y = self.document.height - (HEIGHT - CHROME_PX)
         self.scroll = min(self.scroll + SCROLL_STEP, max_y)
 
     def scrollup(self):
         self.scroll -= SCROLL_STEP
-        self.scroll = max(self.scroll, CHROME_PX)
+        self.scroll = max(self.scroll, 0)
 
     def __repr__(self) -> str:
         return "Tab"
@@ -132,11 +139,13 @@ class Browser:
     def draw(self):
         self.canvas.delete("all")
         assert self.active_tab is not None
+        # タブ描画
         self.tabs[self.active_tab].draw(self.canvas)
         self.canvas.create_rectangle(
             0, 0, WIDTH, CHROME_PX, fill="white", outline="white"
         )
         tabfont = get_font(20, "normal", "roman")
+        # タブバー描画
         for i, tab in enumerate(self.tabs):
             name = "Tab {}".format(i)
             x1, x2 = 40 + 80 * i, 120 + 80 * i
@@ -153,6 +162,15 @@ class Browser:
         self.canvas.create_text(
             11, 0, anchor="nw", text="+", font=buttonfont, fill="black"
         )
+        # URL表示
+        self.canvas.create_rectangle(40, 50, WIDTH - 10, 90, outline="black", width=1)
+        url = self.tabs[self.active_tab].url
+        self.canvas.create_text(
+            55, 55, anchor="nw", text=url, font=buttonfont, fill="black"
+        )
+        # 戻るボタン
+        self.canvas.create_rectangle(10, 50, 35, 90, outline="black", width=1)
+        self.canvas.create_polygon(16, 70, 30, 55, 30, 85, fill="black")
 
     def handle_click(self, e: tkinter.Event):
         if e.y < CHROME_PX:
@@ -160,6 +178,9 @@ class Browser:
                 self.active_tab = (e.x - 40) // 80
             elif 10 <= e.x < 30 and 10 <= e.y < 30:
                 self.load("https://browser.engineering/")
+            elif 10 <= e.x < 35 and 40 <= e.y < 90:
+                assert self.active_tab is not None
+                self.tabs[self.active_tab].go_back()
         else:
             assert self.active_tab is not None
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
