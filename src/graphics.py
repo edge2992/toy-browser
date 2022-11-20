@@ -1,11 +1,11 @@
 import tkinter
 import tkinter.font
 import sys
-from typing import List
+from typing import List, Union
 
 from src.layout import DocumentLayout
 from src.browser import request
-from src.text import Element, HTMLParser
+from src.text import Element, HTMLParser, Text
 from src.draw import Draw
 from src.cssparser import style, CSSParser
 from src.util.node import tree_to_list
@@ -27,11 +27,13 @@ class Browser:
         self.height = HEIGHT
         self.hstep = HSTEP
         self.vstep = VSTEP
+        self.url: Union[str, None] = None
         self.window = tkinter.Tk()
         self.window.bind("<Down>", self.scrolldown)
         self.window.bind("<Up>", self.scrollup)
         self.window.bind("<Right>", self.fontup)
         self.window.bind("<Left>", self.fontdown)
+        self.window.bind("<Button-1>", self.click)
         self.window.bind("<Button-5>", self.scrolldown)
         self.window.bind("<Button-4>", self.scrollup)
         # self.window.bind(
@@ -45,6 +47,7 @@ class Browser:
             self.default_style_sheet = CSSParser(f.read()).parse()
 
     def load(self, url: str):
+        self.url = url
         _, body, _ = request(url)
         self.nodes = HTMLParser(body).parse()
         links = [
@@ -79,19 +82,38 @@ class Browser:
                 continue
             cmd.execute(self.scroll, self.canvas)
 
-    def scrolldown(self, e):
+    def click(self, e: tkinter.Event):
+        x, y = e.x, e.y + self.scroll
+        objs = [
+            obj
+            for obj in tree_to_list(self.document, [])
+            if obj.x <= x < obj.x + obj.width and obj.y <= y < obj.y + obj.height
+        ]
+        if not objs:
+            return
+        elt = objs[-1].node
+        while elt:
+            if isinstance(elt, Text):
+                pass
+            elif isinstance(elt, Element) and "href" in elt.attributes:
+                url = resolve_url(elt.attributes["href"], self.url)
+                return self.load(url)
+
+            elt = elt.parent
+
+    def scrolldown(self, e: tkinter.Event):
         print("scrolldown")
         max_y = self.document.height - self.height
         self.scroll = min(self.scroll + SCROLL_STEP, max_y)
         self.draw()
 
-    def scrollup(self, e):
+    def scrollup(self, e: tkinter.Event):
         print("scrollup")
         self.scroll -= SCROLL_STEP
         self.scroll = max(self.scroll, self.min_scroll)
         self.draw()
 
-    def resize(self, e):
+    def resize(self, e: tkinter.Event):
         self.width = e.width
         self.height = e.height
         print("resize")
@@ -100,7 +122,7 @@ class Browser:
         self.document.paint(self.display_list)
         self.draw()
 
-    def fontup(self, e):
+    def fontup(self, e: tkinter.Event):
         # TODO: Layoutクラスにhstepとvstepを渡す
         self.font = self.font + 1
         self.hstep += 2
@@ -111,7 +133,7 @@ class Browser:
         self.document.paint(self.display_list)
         self.draw()
 
-    def fontdown(self, e):
+    def fontdown(self, e: tkinter.Event):
         # TODO: Layoutクラスにhstepとvstepを渡す
         self.font = self.font - 1
         self.hstep -= 2
