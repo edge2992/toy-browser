@@ -20,11 +20,13 @@ CHROME_PX = 100
 
 
 class Tab:
-    def __init__(self):
+    def __init__(self, width: int, height: int):
         self.scroll = 0
         with open("src/browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
         self.history: List[str] = []
+        self.width = width
+        self.height = height
 
     def load(self, url: str):
         self.history.append(url)
@@ -51,14 +53,14 @@ class Tab:
             rules.extend(CSSParser(body).parse())
         style(self.nodes, sorted(rules, key=cascade_priority))
 
-        self.document = DocumentLayout(self.nodes)
+        self.document = DocumentLayout(self.nodes, width=self.width)
         self.document.layout()
         self.display_list: List[Draw] = []
         self.document.paint(self.display_list)
 
     def draw(self, canvas: tkinter.Canvas):
         for cmd in self.display_list:
-            if cmd.top > self.scroll + HEIGHT - CHROME_PX:
+            if cmd.top > self.scroll + self.height - CHROME_PX:
                 continue
             if cmd.bottom < self.scroll:
                 continue
@@ -90,12 +92,24 @@ class Tab:
             self.load(self.history.pop())
 
     def scrolldown(self):
-        max_y = self.document.height - (HEIGHT - CHROME_PX)
+        max_y = self.document.height - (self.height - CHROME_PX)
         self.scroll = min(self.scroll + SCROLL_STEP, max_y)
 
     def scrollup(self):
         self.scroll -= SCROLL_STEP
         self.scroll = max(self.scroll, 0)
+
+    def resize(self, width, height):
+        print("resizing tag...", width, height)
+        if self.width != width:
+            # widthを変更した場合には再レイアウトが必要
+            self.document = DocumentLayout(self.nodes, width=width)
+            self.document.layout()
+            self.display_list = []
+            self.document.paint(self.display_list)
+
+        self.height = height
+        self.width = width
 
     def __repr__(self) -> str:
         return "Tab"
@@ -110,16 +124,16 @@ class Browser:
         self.window = tkinter.Tk()
         self.window.bind("<Down>", self.handle_down)
         self.window.bind("<Up>", self.handle_up)
+        self.window.bind("<MouseWheel>", self.handle_scroll)
         self.window.bind("<Button-1>", self.handle_click)
         self.window.bind("<Key>", self.handle_key)
         self.window.bind("<Enter>", self.handle_return)
+        self.window.bind("<Configure>", self.handle_resize)
+        # For Linux
         # self.window.bind("<Button-5>", self.scrolldown)
         # self.window.bind("<Button-4>", self.scrollup)
         # self.window.bind("<Right>", self.fontup)
         # self.window.bind("<Left>", self.fontdown)
-        # self.window.bind(
-        #     "<Configure>", self.resize
-        # )  # TODO: キャンバス生成時に3回呼ばれてレンダリングし直してしまう
         self.canvas = tkinter.Canvas(
             self.window, width=self.width, height=self.height, bg="white"
         )
@@ -133,7 +147,8 @@ class Browser:
         self.address_bar = ""
 
     def load(self, url: str):
-        new_tab = Tab()
+        print("browser load")
+        new_tab = Tab(self.width, self.height)
         new_tab.load(url)
         self.active_tab = len(self.tabs)
         self.tabs.append(new_tab)
@@ -145,7 +160,7 @@ class Browser:
         # タブ描画
         self.tabs[self.active_tab].draw(self.canvas)
         self.canvas.create_rectangle(
-            0, 0, WIDTH, CHROME_PX, fill="white", outline="white"
+            0, 0, self.width, CHROME_PX, fill="white", outline="white"
         )
         tabfont = get_font(20, "normal", "roman")
         # タブバー描画
@@ -159,14 +174,16 @@ class Browser:
             )
             if i == self.active_tab:
                 self.canvas.create_line(0, 40, x1, 40, fill="black")
-                self.canvas.create_line(x2, 40, WIDTH, 40, fill="black")
+                self.canvas.create_line(x2, 40, self.width, 40, fill="black")
         buttonfont = get_font(30, "normal", "roman")
         self.canvas.create_rectangle(10, 10, 30, 30, outline="black", width=1)
         self.canvas.create_text(
             11, 0, anchor="nw", text="+", font=buttonfont, fill="black"
         )
         # URL表示
-        self.canvas.create_rectangle(40, 50, WIDTH - 10, 90, outline="black", width=1)
+        self.canvas.create_rectangle(
+            40, 50, self.width - 10, 90, outline="black", width=1
+        )
         url = self.tabs[self.active_tab].url
         self.canvas.create_text(
             55, 55, anchor="nw", text=url, font=buttonfont, fill="black"
@@ -242,14 +259,22 @@ class Browser:
         self.tabs[self.active_tab].scrollup()
         self.draw()
 
-    # def resize(self, e: tkinter.Event):
-    #     self.width = e.width
-    #     self.height = e.height
-    #     print("resize")
-    #     self.document.layout()
-    #     self.display_list = []
-    #     self.document.paint(self.display_list)
-    #     self.draw()
+    def handle_scroll(self, e: tkinter.Event):
+        if e.delta > 0:
+            self.handle_up(e)
+        else:
+            self.handle_down(e)
+
+    def handle_resize(self, e: tkinter.Event):
+        print("resize")
+        if e.width > 1:
+            self.width = e.width
+            self.height = e.height
+            # layout -> paint -> draw
+            for tab in self.tabs:
+                # TODO: 全てのタブのレイアウトを再計算する。再計算を非同期にして、アクティブタブのレイアウトの再計算が終了したらdrawする
+                tab.resize(self.width, self.height)
+            self.draw()
 
     # def fontup(self, e: tkinter.Event):
     #     # TODO: Layoutクラスにhstepとvstepを渡す

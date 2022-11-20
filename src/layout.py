@@ -101,10 +101,12 @@ class LayoutObject(Generic[PN, PRN, CN]):
         self.width: int
         self.height: int
 
-    def paint(self, display_list: List[Draw]):
+    def layout(self):
+        """レイアウトツリーを作成する"""
         raise NotImplementedError
 
-    def layout(self):
+    def paint(self, display_list: List[Draw]):
+        """描画するdisplay_listを作成する"""
         raise NotImplementedError
 
 
@@ -229,17 +231,24 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
 
 
 class DocumentLayout(LayoutObject):
-    def __init__(self, node: HTMLNode):
+    def __init__(
+        self,
+        node: HTMLNode,
+        width: int = WIDTH - 2 * HSTEP,
+        hstep: int = HSTEP,
+        vstep: int = VSTEP,
+    ):
         self.node = node
         self.parent: Union[LayoutObject, None] = None
         self.children: List[LayoutObject] = []
+        self.width = width
+        self.height: int
+        self.x = hstep
+        self.y = vstep
 
     def layout(self) -> None:
         child = BlockLayout(self.node, self, None)
         self.children.append(child)
-        self.width = WIDTH - 2 * HSTEP
-        self.x = HSTEP
-        self.y = VSTEP
         child.layout()
         self.height = child.height + 2 * VSTEP
 
