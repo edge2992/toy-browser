@@ -156,14 +156,24 @@ class Browser:
 
     def draw(self):
         self.canvas.delete("all")
+
+        tabfont = get_font(20, "normal", "roman")
+        buttonfont = get_font(30, "normal", "roman")
+        self._draw_tab()
+        self._draw_tab_bar(tabfont, buttonfont)
+        self._draw_back_button()
+        self._draw_address_bar(buttonfont)
+
+    def _draw_tab(self):
+        # タブの描画
         assert self.active_tab is not None
-        # タブ描画
         self.tabs[self.active_tab].draw(self.canvas)
         self.canvas.create_rectangle(
             0, 0, self.width, CHROME_PX, fill="white", outline="white"
         )
-        tabfont = get_font(20, "normal", "roman")
-        # タブバー描画
+
+    def _draw_tab_bar(self, tabfont, buttonfont):
+        # タブバーの描画
         for i, tab in enumerate(self.tabs):
             name = "Tab {}".format(i)
             x1, x2 = 40 + 80 * i, 120 + 80 * i
@@ -175,24 +185,21 @@ class Browser:
             if i == self.active_tab:
                 self.canvas.create_line(0, 40, x1, 40, fill="black")
                 self.canvas.create_line(x2, 40, self.width, 40, fill="black")
-        buttonfont = get_font(30, "normal", "roman")
         self.canvas.create_rectangle(10, 10, 30, 30, outline="black", width=1)
         self.canvas.create_text(
             11, 0, anchor="nw", text="+", font=buttonfont, fill="black"
         )
-        # URL表示
-        self.canvas.create_rectangle(
-            40, 50, self.width - 10, 90, outline="black", width=1
-        )
-        url = self.tabs[self.active_tab].url
-        self.canvas.create_text(
-            55, 55, anchor="nw", text=url, font=buttonfont, fill="black"
-        )
-        # 戻るボタン
+
+    def _draw_back_button(self):
+        # 戻るボタンの描画
         self.canvas.create_rectangle(10, 50, 35, 90, outline="black", width=1)
         self.canvas.create_polygon(16, 70, 30, 55, 30, 85, fill="black")
 
-        # アドレスバー
+    def _draw_address_bar(self, buttonfont):
+        # アドレスバーの描画
+        self.canvas.create_rectangle(
+            40, 50, self.width - 10, 90, outline="black", width=1
+        )
         if self.forcus == "address bar":
             self.canvas.create_text(
                 55,
@@ -205,6 +212,7 @@ class Browser:
             w = buttonfont.measure(self.address_bar)
             self.canvas.create_line(55 + w, 55, 55 + w, 90, fill="black")
         else:
+            assert self.active_tab is not None
             url = self.tabs[self.active_tab].url
             self.canvas.create_text(
                 55, 55, anchor="nw", text=url, font=buttonfont, fill="black"
