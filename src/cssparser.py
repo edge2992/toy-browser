@@ -1,6 +1,14 @@
 from typing import List, Tuple, Union
 from src.layout import Element, HTMLNode
-from src.selector import CSSRule, Declaration, Selector, TagSelector, DesendantSelector
+from src.selector import (
+    CSSRule,
+    ClassSelector,
+    Declaration,
+    IdSelector,
+    Selector,
+    TagSelector,
+    DesendantSelector,
+)
 
 
 INHERITED_PROPERTIES = {
@@ -112,12 +120,22 @@ class CSSParser:
 
         return pairs
 
+    def simple_selector(self) -> Selector:
+        # impl: .class, #id, tag
+        word = self.word().lower()
+        if word.startswith("."):
+            return ClassSelector(word[1:])
+        elif word.startswith("#"):
+            return IdSelector(word[1:])
+        else:
+            # TODO: impl: tag.class, tag#id
+            return TagSelector(word)
+
     def selector(self) -> Selector:
-        out: Selector = TagSelector(self.word().lower())
+        out: Selector = self.simple_selector()
         self.whitespace()
         while self.i < len(self.s) and self.s[self.i] != "{":
-            tag = self.word()
-            desendant = TagSelector(tag.lower())
+            desendant = self.simple_selector()
             out = DesendantSelector(out, desendant)
             self.whitespace()
         return out
