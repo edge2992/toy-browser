@@ -6,6 +6,7 @@ from src.selector import (
     Declaration,
     IdSelector,
     Selector,
+    SequenceSelector,
     TagSelector,
     DesendantSelector,
 )
@@ -128,7 +129,18 @@ class CSSParser:
         elif word.startswith("#"):
             return IdSelector(word[1:])
         else:
-            # TODO: impl: tag.class, tag#id
+            # impl: tag.class, tag#id
+            # TODO: impl: tag.class#id, tag.class.class, tag#id#id
+            if "." in word:
+                tag, cls = word.split(".", 1)
+                if "#" in cls or "." in cls or "#" in tag or "." in tag:
+                    print("[warning] invalid selector: ", word)
+                return SequenceSelector(TagSelector(tag), ClassSelector(cls))
+            if "#" in word:
+                tag, id_ = word.split("#", 1)
+                if "#" in id_ or "." in id_ or "#" in tag or "." in tag:
+                    print("[warning] invalid selector: ", word)
+                return SequenceSelector(TagSelector(tag), IdSelector(id_))
             return TagSelector(word)
 
     def selector(self) -> Selector:

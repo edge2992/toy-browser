@@ -57,6 +57,19 @@ class IdSelector(Selector):
         return f"IdSelector({self.id_name}, priority={self.priority})"
 
 
+class SequenceSelector(Selector):
+    def __init__(self, tag: Selector, annotation: Selector):
+        super().__init__(tag.priority + annotation.priority)
+        self.tag = tag
+        self.annotation = annotation
+
+    def matches(self, node: HTMLNode) -> bool:
+        return self.tag.matches(node) and self.annotation.matches(node)
+
+    def __repr__(self) -> str:
+        return f"SequenceSelector(tag={self.tag}, annotation={self.annotation}, priority={self.priority})"
+
+
 class DesendantSelector(Selector):
     def __init__(self, ancestor: Selector, descendant: Selector):
         super().__init__(ancestor.priority + descendant.priority)
