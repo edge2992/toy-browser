@@ -37,24 +37,40 @@ class Tab:
         self.scroll = 0
         self.url = url
         self.nodes = HTMLParser(body).parse()
+        style(self.nodes, sorted(self._rules(), key=cascade_priority))
+        self._layout()
+
+    def _rules(self):
+        rules = self.default_style_sheet.copy()
+        node_list = tree_to_list(self.nodes, [])
+
         links = [
             node.attributes["href"]
-            for node in tree_to_list(self.nodes, [])
+            for node in node_list
             if isinstance(node, Element)
             and node.tag == "link"
             and "href" in node.attributes
             and node.attributes.get("rel") == "stylesheet"
         ]
-        rules = self.default_style_sheet.copy()
         for link in links:
             try:
-                _, body, _ = request(resolve_url(link, url))
+                _, body, _ = request(resolve_url(link, self.url))
             except Exception as e:
                 print(e)
                 continue
             rules.extend(CSSParser(body).parse())
-        style(self.nodes, sorted(rules, key=cascade_priority))
-        self._layout()
+
+        inline_styles = [
+            node
+            for node in node_list
+            if isinstance(node, Element) and node.tag == "style"
+        ]
+        for inline_style_node in inline_styles:
+            assert isinstance(inline_style_node.children[0], Text)
+            body = inline_style_node.children[0].text
+            rules.extend(CSSParser(body).parse())
+
+        return rules
 
     def _layout(self):
         # layout -> paint
