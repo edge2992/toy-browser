@@ -20,12 +20,53 @@ CHROME_PX = 100
 FONT_RATIO: float = 0.75
 
 
+class History:
+    def __init__(self):
+        self._history: List[str] = []
+        self.index: int = -1
+
+    def append(self, url: str) -> None:
+        self.index += 1
+        if self.index < len(self._history) and self._history[self.index] == url:
+            pass
+        else:
+            self._history = self._history[: self.index]
+            self._history.append(url)
+
+    def next(self) -> Union[str, None]:
+        if self.has_next():
+            return self._history[self.index + 1]
+        return None
+
+    def previous(self) -> Union[str, None]:
+        if self.has_previous():
+            self.index -= 2
+            return self._history[self.index + 1]
+        return None
+
+    def get_next(self) -> Union[str, None]:
+        if self.has_next():
+            return self._history[self.index + 1]
+        return None
+
+    def get_previous(self) -> Union[str, None]:
+        if self.has_previous():
+            return self._history[self.index - 1]
+        return None
+
+    def has_next(self) -> bool:
+        return self.index < len(self._history) - 1
+
+    def has_previous(self) -> bool:
+        return self.index > 0
+
+
 class Tab:
     def __init__(self, width: int, height: int):
         self.scroll = 0
         with open("src/browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
-        self.history: List[str] = []
+        self.history = History()
         self.width = width
         self.height = height
         self.font_ratio = FONT_RATIO
@@ -90,6 +131,11 @@ class Tab:
             cmd.execute(self.scroll - CHROME_PX, canvas)
 
     def click(self, x, y):
+        url = self.click_link(x, y)
+        if url:
+            self.load(url)
+
+    def click_link(self, x, y) -> Union[str, None]:
         y += self.scroll
         objs = [
             obj
@@ -97,22 +143,27 @@ class Tab:
             if obj.x <= x < obj.x + obj.width and obj.y <= y < obj.y + obj.height
         ]
         if not objs:
-            return
+            return None
         elt = objs[-1].node
         while elt:
             if isinstance(elt, Text):
                 pass
             elif isinstance(elt, Element) and "href" in elt.attributes:
                 url = resolve_url(elt.attributes["href"], self.url)
-                print("tab click", url)
-                return self.load(url)
+                return url
 
             elt = elt.parent
+        return None
 
     def go_back(self):
-        if len(self.history) > 1:
-            self.history.pop()
-            self.load(self.history.pop())
+        url = self.history.previous()
+        if url:
+            self.load(url)
+
+    def go_forward(self):
+        url = self.history.next()
+        if url:
+            self.load(url)
 
     def scrolldown(self):
         max_y = self.document.height - (self.height - CHROME_PX)
@@ -162,8 +213,10 @@ class Browser:
         self.window.bind("<Left>", self.handle_fontdown)
         self.window.bind("<MouseWheel>", self.handle_scroll)
         self.window.bind("<Button-1>", self.handle_click)
+        self.window.bind("<Button-3>", self.handle_middle_click)
         self.window.bind("<Key>", self.handle_key)
-        self.window.bind("<Enter>", self.handle_return)
+        self.window.bind("<BackSpace>", self.handle_backspace)
+        self.window.bind("<Return>", self.handle_return)
         self.window.bind("<Configure>", self.handle_resize)
         # For Linux
         # self.window.bind("<Button-5>", self.scrolldown)
@@ -191,6 +244,7 @@ class Browser:
         self._draw_tab()
         self._draw_tab_bar(tabfont, buttonfont)
         self._draw_back_button()
+        self._draw_forward_button()
         self._draw_address_bar(buttonfont)
 
     def _draw_tab(self):
@@ -221,17 +275,26 @@ class Browser:
 
     def _draw_back_button(self):
         # 戻るボタンの描画
+        assert self.active_tab is not None
         self.canvas.create_rectangle(10, 50, 35, 90, outline="black", width=1)
-        self.canvas.create_polygon(16, 70, 30, 55, 30, 85, fill="black")
+        fill = "black" if self.tabs[self.active_tab].history.has_previous() else "gray"
+        self.canvas.create_polygon(16, 70, 30, 55, 30, 85, fill=fill)
+
+    def _draw_forward_button(self):
+        # 進むボタンの描画
+        assert self.active_tab is not None
+        self.canvas.create_rectangle(40, 50, 65, 90, outline="black", width=1)
+        fill = "black" if self.tabs[self.active_tab].history.has_next() else "gray"
+        self.canvas.create_polygon(45, 55, 59, 70, 45, 85, fill=fill)
 
     def _draw_address_bar(self, buttonfont):
         # アドレスバーの描画
         self.canvas.create_rectangle(
-            40, 50, self.width - 10, 90, outline="black", width=1
+            70, 50, self.width - 10, 90, outline="black", width=1
         )
-        if self.forcus == "address bar":
+        if self.forcus == "address_bar":
             self.canvas.create_text(
-                55,
+                85,
                 55,
                 anchor="nw",
                 text=self.address_bar,
@@ -239,12 +302,12 @@ class Browser:
                 fill="black",
             )
             w = buttonfont.measure(self.address_bar)
-            self.canvas.create_line(55 + w, 55, 55 + w, 90, fill="black")
+            self.canvas.create_line(85 + w, 55, 85 + w, 90, fill="black")
         else:
             assert self.active_tab is not None
             url = self.tabs[self.active_tab].url
             self.canvas.create_text(
-                55, 55, anchor="nw", text=url, font=buttonfont, fill="black"
+                85, 55, anchor="nw", text=url, font=buttonfont, fill="black"
             )
 
     def handle_click(self, e: tkinter.Event):
@@ -260,7 +323,11 @@ class Browser:
                 print("back click", e.x, e.y)
                 assert self.active_tab is not None
                 self.tabs[self.active_tab].go_back()
-            elif 50 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
+            elif 40 <= e.x < 65 and 40 <= e.y < 90:
+                print("forward click", e.x, e.y)
+                assert self.active_tab is not None
+                self.tabs[self.active_tab].go_forward()
+            elif 80 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
                 print("address bar click", e.x, e.y)
                 self.forcus = "address_bar"
                 self.address_bar = ""
@@ -269,18 +336,52 @@ class Browser:
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
         self.draw()
 
+    def handle_middle_click(self, e: tkinter.Event):
+        self.forcus = None
+        if e.y < CHROME_PX:
+            if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
+                # TODO: delete tab
+                self.active_tab = (e.x - 40) // 80
+            elif 10 <= e.x < 35 and 10 <= e.y < 30:
+                # TODO: delete tab
+                print("new tab click", e.x, e.y)
+                pass
+            elif 10 <= e.x < 35 and 40 <= e.y < 90:
+                assert self.active_tab is not None
+                url = self.tabs[self.active_tab].history.get_previous()
+                if url:
+                    self.load(url)
+            elif 40 <= e.x < 65 and 40 <= e.y < 90:
+                assert self.active_tab is not None
+                url = self.tabs[self.active_tab].history.get_next()
+                if url:
+                    self.load(url)
+            elif 80 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
+                pass
+        else:
+            assert self.active_tab is not None
+            url = self.tabs[self.active_tab].click_link(e.x, e.y - CHROME_PX)
+            if url is not None:
+                self.load(url)
+        self.draw()
+
     def handle_key(self, e: tkinter.Event):
         if len(e.char) == 0:
             return
         if not (0x20 <= ord(e.char) < 0x7F):
             return
 
-        if self.forcus == "address bar":
+        if self.forcus == "address_bar":
             self.address_bar += e.char
             self.draw()
 
+    def handle_backspace(self, e: tkinter.Event):
+        if self.forcus == "address_bar":
+            self.address_bar = self.address_bar[:-1]
+            self.draw()
+
     def handle_return(self, e: tkinter.Event):
-        if self.forcus == "address bar":
+        if self.forcus == "address_bar":
             assert self.active_tab is not None
             self.tabs[self.active_tab].load(self.address_bar)
             self.forcus = None
