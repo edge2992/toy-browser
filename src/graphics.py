@@ -44,6 +44,16 @@ class History:
             return self._history[self.index + 1]
         return None
 
+    def get_next(self) -> Union[str, None]:
+        if self.has_next():
+            return self._history[self.index + 1]
+        return None
+
+    def get_previous(self) -> Union[str, None]:
+        if self.has_previous():
+            return self._history[self.index - 1]
+        return None
+
     def has_next(self) -> bool:
         return self.index < len(self._history) - 1
 
@@ -121,6 +131,11 @@ class Tab:
             cmd.execute(self.scroll - CHROME_PX, canvas)
 
     def click(self, x, y):
+        url = self.click_link(x, y)
+        if url:
+            self.load(url)
+
+    def click_link(self, x, y) -> Union[str, None]:
         y += self.scroll
         objs = [
             obj
@@ -128,17 +143,17 @@ class Tab:
             if obj.x <= x < obj.x + obj.width and obj.y <= y < obj.y + obj.height
         ]
         if not objs:
-            return
+            return None
         elt = objs[-1].node
         while elt:
             if isinstance(elt, Text):
                 pass
             elif isinstance(elt, Element) and "href" in elt.attributes:
                 url = resolve_url(elt.attributes["href"], self.url)
-                print("tab click", url)
-                return self.load(url)
+                return url
 
             elt = elt.parent
+        return None
 
     def go_back(self):
         url = self.history.previous()
@@ -198,7 +213,9 @@ class Browser:
         self.window.bind("<Left>", self.handle_fontdown)
         self.window.bind("<MouseWheel>", self.handle_scroll)
         self.window.bind("<Button-1>", self.handle_click)
+        self.window.bind("<Button-3>", self.handle_middle_click)
         self.window.bind("<Key>", self.handle_key)
+        self.window.bind("<BackSpace>", self.handle_backspace)
         self.window.bind("<Return>", self.handle_return)
         self.window.bind("<Configure>", self.handle_resize)
         # For Linux
@@ -319,6 +336,35 @@ class Browser:
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
         self.draw()
 
+    def handle_middle_click(self, e: tkinter.Event):
+        self.forcus = None
+        if e.y < CHROME_PX:
+            if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
+                # TODO: delete tab
+                self.active_tab = (e.x - 40) // 80
+            elif 10 <= e.x < 35 and 10 <= e.y < 30:
+                # TODO: delete tab
+                print("new tab click", e.x, e.y)
+                pass
+            elif 10 <= e.x < 35 and 40 <= e.y < 90:
+                assert self.active_tab is not None
+                url = self.tabs[self.active_tab].history.get_previous()
+                if url:
+                    self.load(url)
+            elif 40 <= e.x < 65 and 40 <= e.y < 90:
+                assert self.active_tab is not None
+                url = self.tabs[self.active_tab].history.get_next()
+                if url:
+                    self.load(url)
+            elif 80 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
+                pass
+        else:
+            assert self.active_tab is not None
+            url = self.tabs[self.active_tab].click_link(e.x, e.y - CHROME_PX)
+            if url is not None:
+                self.load(url)
+        self.draw()
+
     def handle_key(self, e: tkinter.Event):
         if len(e.char) == 0:
             return
@@ -327,6 +373,11 @@ class Browser:
 
         if self.forcus == "address_bar":
             self.address_bar += e.char
+            self.draw()
+
+    def handle_backspace(self, e: tkinter.Event):
+        if self.forcus == "address_bar":
+            self.address_bar = self.address_bar[:-1]
             self.draw()
 
     def handle_return(self, e: tkinter.Event):
