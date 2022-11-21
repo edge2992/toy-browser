@@ -1,6 +1,6 @@
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple, Union
 from src.layout import Element, HTMLNode
-from src.selector import TagSelector, DesendantSelector
+from src.selector import Selector, TagSelector, DesendantSelector
 
 
 INHERITED_PROPERTIES = {
@@ -12,7 +12,7 @@ INHERITED_PROPERTIES = {
 }
 
 
-def compute_style(node: HTMLNode, property: str, value: str):
+def compute_style(node: HTMLNode, property: str, value: str) -> Union[str, None]:
     if property == "font-size":
         if value.endswith("px"):
             return value
@@ -30,7 +30,7 @@ def compute_style(node: HTMLNode, property: str, value: str):
         return value
 
 
-def style(node: HTMLNode, rules):
+def style(node: HTMLNode, rules: List[Tuple[Selector, Dict[str, str]]]) -> None:
     node.style = {}
     for property, default_value in INHERITED_PROPERTIES.items():
         if node.parent:
@@ -112,8 +112,8 @@ class CSSParser:
 
         return pairs
 
-    def selector(self):
-        out = TagSelector(self.word().lower())
+    def selector(self) -> Selector:
+        out: Selector = TagSelector(self.word().lower())
         self.whitespace()
         while self.i < len(self.s) and self.s[self.i] != "{":
             tag = self.word()
@@ -122,8 +122,8 @@ class CSSParser:
             self.whitespace()
         return out
 
-    def parse(self):
-        rules = []
+    def parse(self) -> List[Tuple[Selector, Dict[str, str]]]:
+        rules: List[Tuple[Selector, Dict[str, str]]] = []  # type: ignore
         while self.i < len(self.s):
             try:
                 self.whitespace()

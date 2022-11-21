@@ -6,31 +6,28 @@ from src.entities import ENTITIES_DICT
 
 
 class HTMLNode(ABC):
-    parent: Union[HTMLNode, None]
-    children: List[HTMLNode]
-    style: Dict[str, str] = {}
+    def __init__(self, parent: Union["HTMLNode", None]):
+        self.parent: Union[HTMLNode, None] = parent
+        self.children: List[HTMLNode] = []
+        self.style: Dict[str, str] = {}
 
 
 class Text(HTMLNode):
-    def __init__(self, text: str, parent):
-        self.children = []
-        self.parent = parent
+    def __init__(self, text: str, parent: Union[HTMLNode, None]):
+        super().__init__(parent)
         for c in ENTITIES_DICT:
             text = text.replace(c, ENTITIES_DICT[c])
         self.text = text
-        # self.style = {}
 
     def __repr__(self):
         return repr(self.text)
 
 
 class Element(HTMLNode):
-    def __init__(self, tag: str, attributes: dict, parent):
+    def __init__(self, tag: str, attributes: dict, parent: Union[HTMLNode, None]):
+        super().__init__(parent)
         self.tag = tag
         self.attributes = attributes
-        self.children = []
-        self.parent = parent
-        # self.style = {}
 
     def __repr__(self):
         return "<" + self.tag + ">"
@@ -117,7 +114,7 @@ class HTMLParser:
             node = Element(tag, attributes, parent)
             self.unfinished.append(node)
 
-    def finish(self) -> Union[Element, Text]:
+    def finish(self) -> HTMLNode:
         if len(self.unfinished) == 0:
             self.add_tag("html")
         while len(self.unfinished) > 1:
@@ -126,7 +123,7 @@ class HTMLParser:
             parent.children.append(node)
         return self.unfinished.pop()
 
-    def parse(self) -> Union[Element, Text]:
+    def parse(self) -> HTMLNode:
         text = ""
         in_tag = False
         for c in self.body:

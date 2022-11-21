@@ -1,17 +1,23 @@
 def test_cssparser1():
     from src.cssparser import CSSParser
+    from src.selector import TagSelector
 
     selector = CSSParser("div { foo: bar }").parse()
     print(selector)
     assert len(selector) == 1
+    assert isinstance(selector[0][0], TagSelector)
     assert selector[0][0].tag == "div"
     assert selector[0][1]["foo"] == "bar"
 
 
 def test_cssparser2():
     from src.cssparser import CSSParser
+    from src.selector import DesendantSelector, TagSelector
 
     selector = CSSParser("div span { foo: bar }").parse()
+    assert isinstance(selector[0][0], DesendantSelector)
+    assert isinstance(selector[0][0].ancestor, TagSelector)
+    assert isinstance(selector[0][0].descendant, TagSelector)
     assert selector[0][0].ancestor.tag == "div"
     assert selector[0][0].descendant.tag == "span"
     assert selector[0][1]["foo"] == "bar"
@@ -21,9 +27,15 @@ def test_cssparser2():
 
 def test_cssparser3():
     from src.cssparser import CSSParser
+    from src.selector import DesendantSelector, TagSelector
 
     selector = CSSParser("div span h1 { foo: bar }").parse()
     print(selector)
+    assert isinstance(selector[0][0], DesendantSelector)
+    assert isinstance(selector[0][0].ancestor, DesendantSelector)
+    assert isinstance(selector[0][0].ancestor.ancestor, TagSelector)
+    assert isinstance(selector[0][0].ancestor.descendant, TagSelector)
+    assert isinstance(selector[0][0].descendant, TagSelector)
     assert selector[0][0].ancestor.ancestor.tag == "div"
     assert selector[0][0].ancestor.descendant.tag == "span"
     assert selector[0][0].descendant.tag == "h1"
@@ -32,27 +44,33 @@ def test_cssparser3():
 
 def test_cssparser4():
     from src.cssparser import CSSParser
+    from src.selector import TagSelector
 
     selector = CSSParser("div { foo: bar } span { baz : baz2 }").parse()
     print(selector)
     assert len(selector) == 2
+    assert isinstance(selector[0][0], TagSelector)
     assert selector[0][0].tag == "div"
     assert selector[0][1]["foo"] == "bar"
+    assert isinstance(selector[1][0], TagSelector)
     assert selector[1][0].tag == "span"
     assert selector[1][1]["baz"] == "baz2"
 
 
 def test_unknown_cssparser():
     from src.cssparser import CSSParser
+    from src.selector import TagSelector
 
     selector = CSSParser("a;").parse()
     assert len(selector) == 0
     selector = CSSParser("a {;}").parse()
+    assert isinstance(selector[0][0], TagSelector)
     assert selector[0][0].tag == "a"
     assert len(selector[0][1]) == 0
     selector = CSSParser("{} a;").parse()
     assert len(selector) == 0
     selector = CSSParser("a { p }").parse()
+    assert isinstance(selector[0][0], TagSelector)
     assert selector[0][0].tag == "a"
     assert len(selector[0][1]) == 0
     selector = CSSParser("a { p: v }").parse()
