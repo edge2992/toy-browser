@@ -2,6 +2,8 @@ from __future__ import annotations
 from abc import ABC
 from typing import Dict, Tuple, Union, List
 
+from src.entities import ENTITIES_DICT
+
 
 class HTMLNode(ABC):
     parent: Union[HTMLNode, None]
@@ -11,9 +13,11 @@ class HTMLNode(ABC):
 
 class Text(HTMLNode):
     def __init__(self, text: str, parent):
-        self.text = text
         self.children = []
         self.parent = parent
+        for c in ENTITIES_DICT:
+            text = text.replace(c, ENTITIES_DICT[c])
+        self.text = text
         # self.style = {}
 
     def __repr__(self):
