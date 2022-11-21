@@ -6,6 +6,8 @@
 
 - https://browser.engineering/
 - https://github.com/rust-kr/browser-engineering
+- https://github.com/andrewctate/browser
+- https://gitlab.cs.washington.edu/cse490x-22sp/cse490x-22sp-tests
 
 ## ログ
 
