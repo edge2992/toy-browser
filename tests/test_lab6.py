@@ -2,6 +2,7 @@ def test_cssparser1():
     from src.cssparser import CSSParser
 
     selector = CSSParser("div { foo: bar }").parse()
+    print(selector)
     assert len(selector) == 1
     assert selector[0][0].tag == "div"
     assert selector[0][1]["foo"] == "bar"
@@ -22,6 +23,7 @@ def test_cssparser3():
     from src.cssparser import CSSParser
 
     selector = CSSParser("div span h1 { foo: bar }").parse()
+    print(selector)
     assert selector[0][0].ancestor.ancestor.tag == "div"
     assert selector[0][0].ancestor.descendant.tag == "span"
     assert selector[0][0].descendant.tag == "h1"
@@ -32,6 +34,7 @@ def test_cssparser4():
     from src.cssparser import CSSParser
 
     selector = CSSParser("div { foo: bar } span { baz : baz2 }").parse()
+    print(selector)
     assert len(selector) == 2
     assert selector[0][0].tag == "div"
     assert selector[0][1]["foo"] == "bar"
