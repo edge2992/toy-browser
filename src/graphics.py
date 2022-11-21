@@ -163,7 +163,7 @@ class Browser:
         self.window.bind("<MouseWheel>", self.handle_scroll)
         self.window.bind("<Button-1>", self.handle_click)
         self.window.bind("<Key>", self.handle_key)
-        self.window.bind("<Enter>", self.handle_return)
+        self.window.bind("<Return>", self.handle_return)
         self.window.bind("<Configure>", self.handle_resize)
         # For Linux
         # self.window.bind("<Button-5>", self.scrolldown)
@@ -229,7 +229,7 @@ class Browser:
         self.canvas.create_rectangle(
             40, 50, self.width - 10, 90, outline="black", width=1
         )
-        if self.forcus == "address bar":
+        if self.forcus == "address_bar":
             self.canvas.create_text(
                 55,
                 55,
@@ -275,12 +275,12 @@ class Browser:
         if not (0x20 <= ord(e.char) < 0x7F):
             return
 
-        if self.forcus == "address bar":
+        if self.forcus == "address_bar":
             self.address_bar += e.char
             self.draw()
 
     def handle_return(self, e: tkinter.Event):
-        if self.forcus == "address bar":
+        if self.forcus == "address_bar":
             assert self.active_tab is not None
             self.tabs[self.active_tab].load(self.address_bar)
             self.forcus = None
