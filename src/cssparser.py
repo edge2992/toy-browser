@@ -1,6 +1,6 @@
-from typing import Dict, List, Tuple, Union
+from typing import List, Tuple, Union
 from src.layout import Element, HTMLNode
-from src.selector import Selector, TagSelector, DesendantSelector
+from src.selector import CSSRule, Declaration, Selector, TagSelector, DesendantSelector
 
 
 INHERITED_PROPERTIES = {
@@ -30,7 +30,7 @@ def compute_style(node: HTMLNode, property: str, value: str) -> Union[str, None]
         return value
 
 
-def style(node: HTMLNode, rules: List[Tuple[Selector, Dict[str, str]]]) -> None:
+def style(node: HTMLNode, rules: List[CSSRule]) -> None:
     node.style = {}
     for property, default_value in INHERITED_PROPERTIES.items():
         if node.parent:
@@ -93,8 +93,8 @@ class CSSParser:
             else:
                 self.i += 1
 
-    def body(self) -> Dict[str, str]:
-        pairs: Dict[str, str] = {}
+    def body(self) -> Declaration:
+        pairs: Declaration = {}
         while self.i < len(self.s) and self.s[self.i] != "}":
             try:
                 prop, val = self.pair()
@@ -122,8 +122,8 @@ class CSSParser:
             self.whitespace()
         return out
 
-    def parse(self) -> List[Tuple[Selector, Dict[str, str]]]:
-        rules: List[Tuple[Selector, Dict[str, str]]] = []  # type: ignore
+    def parse(self) -> List[CSSRule]:
+        rules: List[CSSRule] = []  # type: ignore
         while self.i < len(self.s):
             try:
                 self.whitespace()

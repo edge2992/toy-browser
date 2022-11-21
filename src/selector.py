@@ -11,6 +11,10 @@ class Selector(ABC):
         raise NotImplementedError
 
 
+Declaration = Dict[str, str]
+CSSRule = Tuple[Selector, Declaration]
+
+
 class TagSelector(Selector):
     def __init__(self, tag):
         super().__init__(1)
@@ -29,7 +33,7 @@ class DesendantSelector(Selector):
         self.ancestor = ancestor
         self.descendant = descendant
 
-    def matches(self, node):
+    def matches(self, node: HTMLNode) -> bool:
         if not self.descendant.matches(node):
             return False
         while node.parent:
@@ -44,6 +48,6 @@ class DesendantSelector(Selector):
         )
 
 
-def cascade_priority(rule: Tuple[Selector, Dict]):
-    selector, body = rule
+def cascade_priority(rule: CSSRule):
+    selector, _ = rule
     return selector.priority
