@@ -1,17 +1,26 @@
-from typing import Dict, Tuple
+from typing import List, Tuple, Union
 from src.layout import Element, HTMLNode
-from src.selector import TagSelector, DesendantSelector
+from src.selector import (
+    CSSRule,
+    ClassSelector,
+    Declaration,
+    IdSelector,
+    Selector,
+    TagSelector,
+    DesendantSelector,
+)
 
 
 INHERITED_PROPERTIES = {
     "font-size": "16px",
     "font-style": "normal",
     "font-weight": "normal",
+    "font-family": "Times",
     "color": "black",
 }
 
 
-def compute_style(node, property, value):
+def compute_style(node: HTMLNode, property: str, value: str) -> Union[str, None]:
     if property == "font-size":
         if value.endswith("px"):
             return value
@@ -29,7 +38,7 @@ def compute_style(node, property, value):
         return value
 
 
-def style(node: HTMLNode, rules):
+def style(node: HTMLNode, rules: List[CSSRule]) -> None:
     node.style = {}
     for property, default_value in INHERITED_PROPERTIES.items():
         if node.parent:
@@ -92,8 +101,8 @@ class CSSParser:
             else:
                 self.i += 1
 
-    def body(self) -> Dict[str, str]:
-        pairs: Dict[str, str] = {}
+    def body(self) -> Declaration:
+        pairs: Declaration = {}
         while self.i < len(self.s) and self.s[self.i] != "}":
             try:
                 prop, val = self.pair()
@@ -111,18 +120,28 @@ class CSSParser:
 
         return pairs
 
-    def selector(self):
-        out = TagSelector(self.word().lower())
+    def simple_selector(self) -> Selector:
+        # impl: .class, #id, tag
+        word = self.word().lower()
+        if word.startswith("."):
+            return ClassSelector(word[1:])
+        elif word.startswith("#"):
+            return IdSelector(word[1:])
+        else:
+            # TODO: impl: tag.class, tag#id
+            return TagSelector(word)
+
+    def selector(self) -> Selector:
+        out: Selector = self.simple_selector()
         self.whitespace()
         while self.i < len(self.s) and self.s[self.i] != "{":
-            tag = self.word()
-            desendant = TagSelector(tag.lower())
+            desendant = self.simple_selector()
             out = DesendantSelector(out, desendant)
             self.whitespace()
         return out
 
-    def parse(self):
-        rules = []
+    def parse(self) -> List[CSSRule]:
+        rules: List[CSSRule] = []  # type: ignore
         while self.i < len(self.s):
             try:
                 self.whitespace()

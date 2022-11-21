@@ -7,22 +7,26 @@ from src.text import Element, HTMLNode, Text
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
-FONTS: Dict[Tuple[int, str, str], tkinter.font.Font] = {}  # font cache
+FONTS: Dict[
+    Tuple[Union[str, None], int, str, str], tkinter.font.Font
+] = {}  # font cache
 FONT_METRICS: Dict[Tuple[int, str, str], dict] = {}
 FONT_RATIO: float = 0.75
 
 
-def get_font(size: int, weight: str, slant: str) -> tkinter.font.Font:
-    key = (size, weight, slant)
+def get_font(
+    family: Union[str, None], size: int, weight: str, slant: str
+) -> tkinter.font.Font:
+    key = (family, size, weight, slant)
     if key not in FONTS:
-        FONTS[key] = tkinter.font.Font(size=size, weight=weight, slant=slant)  # type: ignore
+        FONTS[key] = tkinter.font.Font(family=family, size=size, weight=weight, slant=slant)  # type: ignore
     return FONTS[key]
 
 
 def get_font_metric(size: int, weight: str, slant: str) -> dict:
     key = (size, weight, slant)
     if key not in FONT_METRICS:
-        FONT_METRICS[key] = get_font(size, weight, slant).metrics()  # type: ignore
+        FONT_METRICS[key] = get_font(None, size, weight, slant).metrics()  # type: ignore
     return FONT_METRICS[key]
 
 
@@ -68,6 +72,8 @@ BLOCK_ELEMENTS = [
 
 
 def layout_mode(node: HTMLNode) -> str:
+    if isinstance(node, Element) and node.tag == "head":
+        return "head"
     if isinstance(node, Text):
         return "inline"
     elif node.children:
@@ -157,11 +163,18 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutO
         # English
         weight = node.style["font-weight"]
         style = node.style["font-style"]
+        family = node.style["font-family"]
 
         if style == "normal":
             style = "roman"
         size = int(float(node.style["font-size"][:-2]) * self.font_ratio)
-        font = get_font(size, weight, style)
+
+        try:
+            font = get_font(family, size, weight, style)
+        except tkinter.TclError as e:
+            print("[warning]", e)
+            font = get_font(None, size, weight, style)
+
         for word in node.text.split():
             w = font.measure(word)
             if self.cursor_x + w > self.width - HSTEP:
@@ -209,14 +222,27 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
         # create child layout object
         for child in self.node.children:
             next: Union[InlineLayout, BlockLayout]
-            if layout_mode(child) == "inline":
+            mode = layout_mode(child)
+            if mode == "inline":
                 next = InlineLayout(child, self, previous, self.font_ratio)
-            else:
+            elif mode == "block":
                 next = BlockLayout(child, self, previous, self.font_ratio)
+            else:
+                # headを飛ばす
+                continue
             self.children.append(next)
             previous = next
         # width, x, yをparentとpreviousを参考に計算する
         self.width = self.parent.width
+        if "width" in self.node.style:
+            if self.node.style["width"].endswith("px"):
+                # responsiveにする必要があるか?
+                self.width = min(int(self.node.style["width"][:-2]), self.parent.width)
+            elif self.node.style["width"] == "auto":
+                pass
+            else:
+                print("[warning] unknown width", self.node.style["width"])
+
         self.x = self.parent.x
         if self.previous:
             self.y = self.previous.y + self.previous.height
@@ -227,6 +253,13 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
             child_layout.layout()
         # childrenを全て読んでheightを計算
         self.height = sum([child.height for child in self.children])
+        if "height" in self.node.style:
+            if self.node.style["height"].endswith("px"):
+                self.height = int(self.node.style["height"][:-2])
+            elif self.node.style["height"] == "auto":
+                pass
+            else:
+                print("[warning] unknown height", self.node.style["height"])
 
     def paint(self, display_list: List[Draw]) -> None:
         for child in self.children:
@@ -291,13 +324,26 @@ class LineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "TextLayo
         for word in self.children:
             word.layout()
 
-        max_ascent = max(word.font.metrics("ascent") for word in self.children)
+        try:
+            max_ascent = max(word.font.metrics("ascent") for word in self.children)
+        except ValueError as e:
+            print("[max_ascent warnings] ", e)
+            print("self node", self.node)
+            print("parent node", self.parent.node)
+            max_ascent = 0
 
         baseline = self.y + 1.25 * max_ascent
         for word in self.children:
             word.y = int(baseline - word.font.metrics("ascent"))
 
-        max_descent = max([word.font.metrics("descent") for word in self.children])
+        try:
+            max_descent = max([word.font.metrics("descent") for word in self.children])
+        except ValueError as e:
+            print("[max_decent warnings] ", e)
+            print("self node", self.node)
+            print("parent node", self.parent.node)
+            max_descent = 0
+
         self.height = int(1.25 * (max_ascent + max_descent))
 
     def paint(self, display_list: List[Draw]) -> None:
@@ -326,10 +372,16 @@ class TextLayout(LayoutObject[LineLayout, Union["TextLayout", None], LayoutObjec
     def layout(self):
         weight = self.node.style["font-weight"]
         style = self.node.style["font-style"]
+        family = self.node.style["font-family"]
         if style == "normal":
             style = "roman"
         size = int(float(self.node.style["font-size"][:-2]) * self.font_ratio)
-        self.font = get_font(size, weight, style)
+        try:
+            self.font = get_font(family, size, weight, style)
+        except tkinter.TclError as e:
+            print("[warning]", e)
+            self.font = get_font(None, size, weight, style)
+
         self.width = self.font.measure(self.word)
         if self.previous:
             space = self.previous.font.measure(" ")
