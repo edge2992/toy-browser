@@ -234,6 +234,15 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
             previous = next
         # width, x, yをparentとpreviousを参考に計算する
         self.width = self.parent.width
+        if "width" in self.node.style:
+            if self.node.style["width"].endswith("px"):
+                # responsiveにする必要があるか?
+                self.width = min(int(self.node.style["width"][:-2]), self.parent.width)
+            elif self.node.style["width"] == "auto":
+                pass
+            else:
+                print("[warning] unknown width", self.node.style["width"])
+
         self.x = self.parent.x
         if self.previous:
             self.y = self.previous.y + self.previous.height
@@ -244,6 +253,13 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
             child_layout.layout()
         # childrenを全て読んでheightを計算
         self.height = sum([child.height for child in self.children])
+        if "height" in self.node.style:
+            if self.node.style["height"].endswith("px"):
+                self.height = int(self.node.style["height"][:-2])
+            elif self.node.style["height"] == "auto":
+                pass
+            else:
+                print("[warning] unknown height", self.node.style["height"])
 
     def paint(self, display_list: List[Draw]) -> None:
         for child in self.children:
