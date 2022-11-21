@@ -7,11 +7,12 @@ INHERITED_PROPERTIES = {
     "font-size": "16px",
     "font-style": "normal",
     "font-weight": "normal",
+    "font-family": "Times",
     "color": "black",
 }
 
 
-def compute_style(node, property, value):
+def compute_style(node: HTMLNode, property: str, value: str):
     if property == "font-size":
         if value.endswith("px"):
             return value

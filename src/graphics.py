@@ -186,8 +186,8 @@ class Browser:
     def draw(self):
         self.canvas.delete("all")
 
-        tabfont = get_font(20, "normal", "roman")
-        buttonfont = get_font(30, "normal", "roman")
+        tabfont = get_font(None, 20, "normal", "roman")
+        buttonfont = get_font(None, 30, "normal", "roman")
         self._draw_tab()
         self._draw_tab_bar(tabfont, buttonfont)
         self._draw_back_button()
