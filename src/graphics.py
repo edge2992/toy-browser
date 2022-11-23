@@ -201,6 +201,11 @@ class Tab:
             self.forcus.attributes["value"] += char
             self.render()
 
+    def backspace(self):
+        if self.forcus:
+            self.forcus.attributes["value"] = self.forcus.attributes["value"][:-1]
+            self.render()
+
     def go_back(self):
         url = self.history.previous()
         if url:
@@ -429,6 +434,10 @@ class Browser:
     def handle_backspace(self, e: tkinter.Event):
         if self.forcus == "address_bar":
             self.address_bar = self.address_bar[:-1]
+            self.draw()
+        elif self.forcus == "content":
+            assert self.active_tab is not None
+            self.tabs[self.active_tab].backspace()
             self.draw()
 
     def handle_return(self, e: tkinter.Event):
