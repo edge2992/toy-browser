@@ -43,7 +43,7 @@ def form_decode(body: str) -> Dict:
 
 
 def add_entry(params) -> str:
-    if "guest" in params:
+    if "guest" in params and len(params["guest"]) <= 100:
         ENTRIES.append(params["guest"])
     return show_comments()
 
