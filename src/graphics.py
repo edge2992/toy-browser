@@ -6,7 +6,7 @@ from typing import List, Union
 import urllib.parse
 
 from src.layout import DocumentLayout, InputLayout, LayoutObject, get_font
-from src.browser import request
+from src.network import request
 from src.text import Element, HTMLParser, Text
 from src.draw import Draw
 from src.cssparser import style, CSSParser

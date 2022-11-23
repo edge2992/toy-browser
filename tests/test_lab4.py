@@ -51,7 +51,7 @@ def test_layout(mocker):
     from src.draw import DrawText
 
     with mocker.patch(
-        "src.browser._get_headers_and_body", return_value=("", "<p>text</p>")
+        "src.network._get_headers_and_body", return_value=("", "<p>text</p>")
     ):
         browser = Browser()
         browser.load("http://test.test/example1")

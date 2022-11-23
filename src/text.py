@@ -166,7 +166,7 @@ def print_tree(node, indent: int = 0):
 
 
 if __name__ == "__main__":
-    from src.browser import request
+    from src.network import request
     import sys
 
     headers, body, _ = request(sys.argv[1])

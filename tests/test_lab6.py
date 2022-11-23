@@ -146,7 +146,7 @@ def test_priority(mocker):
     from src.graphics import Browser
 
     with mocker.patch(
-        "src.browser._get_headers_and_body",
+        "src.network._get_headers_and_body",
         return_value=("", '<div style="color:blue">Test</div>'),
     ):
         browser = Browser()

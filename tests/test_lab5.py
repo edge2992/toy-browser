@@ -39,7 +39,7 @@ def test_layout_tree(mocker):
     sample_html = "<div></div><div>text</div><div><div></div>text</div><span></span><span>text</span>"
     url = "http://test.test/example1"
     with mocker.patch(
-        "src.browser._get_headers_and_body", return_value=("", sample_html)
+        "src.network._get_headers_and_body", return_value=("", sample_html)
     ):
         browser = Browser()
         browser.load(url)
