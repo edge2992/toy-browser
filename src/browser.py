@@ -1,10 +1,12 @@
 import gzip
 import socket
 import ssl
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 
-def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[str]]:
+def request(
+    url: str, payload: Union[str, None] = None, max_redirs: int = 50
+) -> Tuple[Dict[str, str], str, List[str]]:
     if max_redirs == 0:
         raise Exception("Too many redirects")
 

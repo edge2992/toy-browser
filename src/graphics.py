@@ -3,8 +3,9 @@ import tkinter
 import tkinter.font
 import sys
 from typing import List, Union
+import urllib.parse
 
-from src.layout import DocumentLayout, get_font
+from src.layout import DocumentLayout, InputLayout, LayoutObject, get_font
 from src.browser import request
 from src.text import Element, HTMLParser, Text
 from src.draw import Draw
@@ -70,16 +71,17 @@ class Tab:
         self.width = width
         self.height = height
         self.font_ratio = FONT_RATIO
+        self.forcus: Union[Element, None] = None
 
-    def load(self, url: str):
+    def load(self, url: str, body: Union[str, None] = None):
         self.history.append(url)
-        header, body, _ = request(url)
+        header, body, _ = request(url, payload=body)
         print("header\n", header)
         self.scroll = 0
         self.url = url
         self.nodes = HTMLParser(body).parse()
-        style(self.nodes, sorted(self._rules(), key=cascade_priority))
-        self._layout()
+        self.rules = self._rules()
+        self.render()
 
     def _rules(self):
         rules = self.default_style_sheet.copy()
@@ -113,8 +115,9 @@ class Tab:
 
         return rules
 
-    def _layout(self):
+    def render(self) -> None:
         # layout -> paint
+        style(self.nodes, sorted(self.rules, key=cascade_priority))
         self.document = DocumentLayout(
             self.nodes, width=self.width, font_ratio=self.font_ratio
         )
@@ -130,14 +133,37 @@ class Tab:
                 continue
             cmd.execute(self.scroll - CHROME_PX, canvas)
 
-    def click(self, x, y):
-        url = self.click_link(x, y)
-        if url:
-            self.load(url)
+        if self.forcus:
+            obj = [
+                obj
+                for obj in tree_to_list(self.document, [])
+                if obj.node == self.forcus and isinstance(obj, InputLayout)
+            ][0]
+            text = self.forcus.attributes.get("value", "")
+            x = obj.x + obj.font.measure(text)
+            y = obj.y - self.scroll + CHROME_PX
+            canvas.create_line(x, y, x, y + obj.height)
 
-    def click_link(self, x, y) -> Union[str, None]:
+    def submit_form(self, elt: Element):
+        inputs: List[Element] = [
+            node
+            for node in tree_to_list(elt, [])
+            if isinstance(node, Element)
+            and node.tag == "input"
+            and "name" in node.attributes
+        ]
+        body = ""
+        for input in inputs:
+            name = urllib.parse.quote(input.attributes["name"])
+            value = urllib.parse.quote(input.attributes.get("value", ""))
+            body += "&" + name + "=" + value
+        body = body[1:]
+        url = resolve_url(elt.attributes["action"], self.url)
+        self.load(url, body)
+
+    def click(self, x, y):
         y += self.scroll
-        objs = [
+        objs: List[LayoutObject] = [
             obj
             for obj in tree_to_list(self.document, [])
             if obj.x <= x < obj.x + obj.width and obj.y <= y < obj.y + obj.height
@@ -148,12 +174,31 @@ class Tab:
         while elt:
             if isinstance(elt, Text):
                 pass
-            elif isinstance(elt, Element) and "href" in elt.attributes:
-                url = resolve_url(elt.attributes["href"], self.url)
-                return url
-
+            elif isinstance(elt, Element):
+                if "href" in elt.attributes:
+                    url = resolve_url(elt.attributes["href"], self.url)
+                    return self.load(url)
+                elif elt.tag == "input":
+                    self.forcus = elt
+                    elt.attributes["value"] = ""
+                    return self.render()
+                elif elt.tag == "button":
+                    while elt:
+                        if (
+                            isinstance(elt, Element)
+                            and elt.tag == "form"
+                            and "action" in elt.attributes
+                        ):
+                            return self.submit_form(elt)
+                        elt = elt.parent
+            assert elt
             elt = elt.parent
         return None
+
+    def keypress(self, char: str):
+        if self.forcus:
+            self.forcus.attributes["value"] += char
+            self.render()
 
     def go_back(self):
         url = self.history.previous()
@@ -175,18 +220,18 @@ class Tab:
 
     def fontup(self):
         self.font_ratio += 0.1
-        self._layout()
+        self.render()
 
     def fontdown(self):
         self.font_ratio -= 0.1
-        self._layout()
+        self.render()
 
     def resize(self, width, height):
         print("resizing tag...", width, height)
         if self.width != width:
             # widthを変更した場合には再レイアウトが必要
             self.width = width
-            self._layout()
+            self.render()
 
         self.height = height
         self.width = width
@@ -333,6 +378,7 @@ class Browser:
                 self.address_bar = ""
         else:
             assert self.active_tab is not None
+            self.forcus = "content"
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
         self.draw()
 
@@ -360,7 +406,7 @@ class Browser:
                 pass
         else:
             assert self.active_tab is not None
-            url = self.tabs[self.active_tab].click_link(e.x, e.y - CHROME_PX)
+            url = self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
             if url is not None:
                 self.load(url)
         self.draw()
@@ -373,6 +419,10 @@ class Browser:
 
         if self.forcus == "address_bar":
             self.address_bar += e.char
+            self.draw()
+        elif self.forcus == "content":
+            assert self.active_tab is not None
+            self.tabs[self.active_tab].keypress(e.char)
             self.draw()
 
     def handle_backspace(self, e: tkinter.Event):
