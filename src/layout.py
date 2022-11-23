@@ -7,6 +7,7 @@ from src.text import Element, HTMLNode, Text
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
+INPUT_WIDTH_PX = 200
 FONTS: Dict[
     Tuple[Union[str, None], int, str, str], tkinter.font.Font
 ] = {}  # font cache
@@ -83,6 +84,8 @@ def layout_mode(node: HTMLNode) -> str:
             if isinstance(child, Element) and child.tag in BLOCK_ELEMENTS:
                 return "block"
         return "inline"
+    elif isinstance(node, Element) and node.tag == "input":
+        return "inline"
     else:
         return "block"
 
@@ -110,6 +113,22 @@ class LayoutObject(Generic[PN, PRN, CN]):
         self.height: int
         self.font_ratio = font_ratio
 
+    def get_font(self, node: HTMLNode) -> tkinter.font.Font:
+        weight = node.style["font-weight"]
+        style = node.style["font-style"]
+        family = node.style["font-family"]
+
+        if style == "normal":
+            style = "roman"
+        size = int(float(node.style["font-size"][:-2]) * self.font_ratio)
+
+        try:
+            font = get_font(family, size, weight, style)
+        except tkinter.TclError as e:
+            print("[warning]", e)
+            font = get_font(None, size, weight, style)
+        return font
+
     def layout(self):
         """レイアウトツリーを作成する"""
         raise NotImplementedError
@@ -119,7 +138,7 @@ class LayoutObject(Generic[PN, PRN, CN]):
         raise NotImplementedError
 
 
-class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutObject]):
+class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLayout"]):
     def __init__(
         self,
         node: HTMLNode,
@@ -129,7 +148,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutO
     ):
         super().__init__(node, parent, previous, font_ratio)
         self.font_metrics: List[dict] = []
-        self.previous_word: Union[TextLayout, None] = None
+        self.previous_word: Union[TextLayout, InputLayout, None] = None
 
     def layout(self):
         self.width = self.parent.width
@@ -154,26 +173,16 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutO
         elif isinstance(node, Element):
             if node.tag == "br":
                 self.new_line()
-            for child in node.children:
-                self.recurse(child)
+            elif node.tag == "input" or node.tag == "button":
+                self.input(node)
+            else:
+                for child in node.children:
+                    self.recurse(child)
         else:
             raise ValueError("Unknown node type")
 
     def text(self, node: Text) -> None:
-        # English
-        weight = node.style["font-weight"]
-        style = node.style["font-style"]
-        family = node.style["font-family"]
-
-        if style == "normal":
-            style = "roman"
-        size = int(float(node.style["font-size"][:-2]) * self.font_ratio)
-
-        try:
-            font = get_font(family, size, weight, style)
-        except tkinter.TclError as e:
-            print("[warning]", e)
-            font = get_font(None, size, weight, style)
+        font = self.get_font(node)
 
         for word in node.text.split():
             w = font.measure(word)
@@ -193,11 +202,33 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutO
         new_line = LineLayout(self.node, self, last_line, self.font_ratio)
         self.children.append(new_line)
 
+    def input(self, node: Element):
+        w = INPUT_WIDTH_PX
+        if self.cursor_x + w > self.x + self.width:
+            self.new_line()
+        line = self.children[-1]
+        input = InputLayout(node, line, self.previous_word, self.font_ratio)
+        line.children.append(input)
+        self.previous_word = input
+        font = self.get_font(node)
+        self.cursor_x += w + font.measure(" ")
+
     def paint(self, display_list: List[Draw]) -> None:
         bgcolor = self.node.style.get("background-color", "transparent")
-        if bgcolor != "transparent":
-            x2, y2 = self.x + self.width, self.y + self.height
-            display_list.append(DrawRect(self.x, self.y, x2, y2, bgcolor))
+        is_atomic = not isinstance(self.node, Text) and (
+            isinstance(self.node, Element)
+            and self.node.tag
+            in [
+                "input",
+                "button",
+            ]
+        )
+
+        if not is_atomic:
+            if bgcolor != "transparent":
+                x2, y2 = self.x + self.width, self.y + self.height
+                display_list.append(DrawRect(self.x, self.y, x2, y2, bgcolor))
+
         for child in self.children:
             child.paint(display_list)
 
@@ -302,7 +333,11 @@ class DocumentLayout(LayoutObject):
         return "DocumentLayout()"
 
 
-class LineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "TextLayout"]):
+class LineLayout(
+    LayoutObject[
+        LayoutObject, Union[LayoutObject, None], Union["TextLayout", "InputLayout"]
+    ]
+):
     def __init__(
         self,
         node: HTMLNode,
@@ -356,13 +391,15 @@ class LineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "TextLayo
         )
 
 
-class TextLayout(LayoutObject[LineLayout, Union["TextLayout", None], LayoutObject]):
+class TextLayout(
+    LayoutObject[LineLayout, Union["TextLayout", "InputLayout", None], LayoutObject]
+):
     def __init__(
         self,
         node: HTMLNode,
         word: str,
         parent: LineLayout,
-        previous: Union[TextLayout, None],
+        previous: Union[TextLayout, InputLayout, None],
         font_ratio: float = FONT_RATIO,
     ):
         super().__init__(node, parent, previous, font_ratio)
@@ -370,18 +407,7 @@ class TextLayout(LayoutObject[LineLayout, Union["TextLayout", None], LayoutObjec
         self.font: tkinter.font.Font
 
     def layout(self):
-        weight = self.node.style["font-weight"]
-        style = self.node.style["font-style"]
-        family = self.node.style["font-family"]
-        if style == "normal":
-            style = "roman"
-        size = int(float(self.node.style["font-size"][:-2]) * self.font_ratio)
-        try:
-            self.font = get_font(family, size, weight, style)
-        except tkinter.TclError as e:
-            print("[warning]", e)
-            self.font = get_font(None, size, weight, style)
-
+        self.font = self.get_font(self.node)
         self.width = self.font.measure(self.word)
         if self.previous:
             space = self.previous.font.measure(" ")
@@ -398,4 +424,63 @@ class TextLayout(LayoutObject[LineLayout, Union["TextLayout", None], LayoutObjec
     def __repr__(self) -> str:
         return ("TextLayout(x={}, y={}, width={}, height={}, node={}, word={})").format(
             self.x, self.y, self.width, self.height, self.node, self.word
+        )
+
+
+class InputLayout(
+    LayoutObject[
+        LineLayout,
+        Union[TextLayout, "InputLayout", None],
+        Union[TextLayout, "InputLayout"],
+    ]
+):
+    def __init__(
+        self,
+        node: HTMLNode,
+        parent: LineLayout,
+        previous: Union[TextLayout, "InputLayout", None],
+        font_ratio: float = FONT_RATIO,
+    ):
+        super().__init__(node, parent, previous, font_ratio)
+        # self.word = word
+        self.font: tkinter.font.Font
+
+    def layout(self):
+        self.font = self.get_font(self.node)
+
+        self.width = INPUT_WIDTH_PX
+        if self.previous:
+            space = self.previous.font.measure(" ")
+            self.x = self.previous.x + space + self.previous.width
+        else:
+            self.x = self.parent.x
+
+        self.height = self.font.metrics("linespace")
+
+    def paint(self, display_list: List[Draw]) -> None:
+        bgcolor = self.node.style.get("background-color", "transparent")
+        if bgcolor != "transparent":
+            x2, y2 = self.x + self.width, self.y + self.height
+            rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
+            display_list.append(rect)
+
+        assert isinstance(self.node, Element)
+
+        if self.node.tag == "input":
+            text = self.node.attributes.get("value", "")
+        elif self.node.tag == "button":
+            assert isinstance(self.node.children[0], Text)
+            text = self.node.children[0].text
+        else:
+            raise ValueError("Invalid tag for InputLayout")
+
+        color = self.node.style["color"]
+        display_list.append(DrawText(self.x, self.y, text, self.font, color))
+
+        color = self.node.style["color"]
+        display_list.append(DrawText(self.x, self.y, text, self.font, color))
+
+    def __repr__(self) -> str:
+        return ("InputLayout(x={}, y={}, width={}, height={}, node={})").format(
+            self.x, self.y, self.width, self.height, self.node
         )

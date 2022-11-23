@@ -24,7 +24,9 @@ class Text(HTMLNode):
 
 
 class Element(HTMLNode):
-    def __init__(self, tag: str, attributes: dict, parent: Union[HTMLNode, None]):
+    def __init__(
+        self, tag: str, attributes: Dict[str, str], parent: Union[HTMLNode, None]
+    ):
         super().__init__(parent)
         self.tag = tag
         self.attributes = attributes
@@ -164,7 +166,7 @@ def print_tree(node, indent: int = 0):
 
 
 if __name__ == "__main__":
-    from src.browser import request
+    from src.network import request
     import sys
 
     headers, body, _ = request(sys.argv[1])

@@ -1,14 +1,17 @@
 import gzip
 import socket
 import ssl
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 
-def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[str]]:
+def request(
+    url: str, payload: Union[str, None] = None, max_redirs: int = 50
+) -> Tuple[Dict[str, str], str, List[str]]:
     if max_redirs == 0:
         raise Exception("Too many redirects")
 
     option: List[str] = []
+    method: str = "POST" if payload else "GET"
     scheme, url = url.split(":", 1)
 
     assert scheme in [
@@ -54,35 +57,45 @@ def request(url: str, max_redirs: int = 50) -> Tuple[Dict[str, str], str, List[s
             ctx = ssl.create_default_context()
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 headers, body = _get_headers_and_body(
-                    ssock, host, port, path, scheme, max_redirs
+                    ssock, method, host, port, path, scheme, payload, max_redirs
                 )
                 return headers, body, option
         headers, body = _get_headers_and_body(
-            sock, host, port, path, scheme, max_redirs
+            sock, method, host, port, path, scheme, payload, max_redirs
         )
         return headers, body, option
 
 
-def _get_headers_and_body(sock, host, port, path, scheme, max_redirs):
+def _get_headers_and_body(
+    sock: socket.socket,
+    method: str,
+    host: str,
+    port: int,
+    path: str,
+    scheme: str,
+    payload: Union[str, None],
+    max_redirs: int,
+):
     sock.connect((host, port))
 
-    if scheme == "http":
-        sock.send("GET {} HTTP/1.0\r\n".format(path).encode("utf-8"))
-    else:
-        sock.send("GET {} HTTP/1.1\r\n".format(path).encode("utf-8"))
-
-    header = {}
-    header["Host"] = host
-    header[
+    headers: Dict[str, str] = {}
+    headers["Host"] = host
+    headers[
         "User-Agent"
     ] = "Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0"
-    header["Connection"] = "close"
-    header["Accept-Encoding"] = "gzip"
+    headers["Connection"] = "close"
+    headers["Accept-Encoding"] = "gzip"
+    if method == "POST":
+        assert payload is not None
+        headers["Content-Length"] = str(len(payload.encode("utf-8")))
 
-    sock.send(
-        "\r\n".join("{}: {}".format(k, v) for k, v in header.items()).encode("utf-8")
-    )
-    sock.send("\r\n\r\n".encode("utf-8"))
+    version = "HTTP/1.1" if scheme == "https" else "HTTP/1.0"
+
+    body = "{} {} {}\r\n".format(method, path, version)
+    body += "\r\n".join("{}: {}".format(k, v) for k, v in headers.items()) + "\r\n"
+    body += "\r\n" + (payload or "")
+
+    sock.send(body.encode("utf-8"))
 
     response = sock.makefile("rb", newline="\r\n")
     statusline = response.readline().decode("utf-8")
@@ -100,28 +113,27 @@ def _get_headers_and_body(sock, host, port, path, scheme, max_redirs):
         headers[header.lower()] = value.strip()
 
     if "location" in headers:
-        headers, body, option = request(headers["location"], max_redirs - 1)
+        headers, body, option = request(headers["location"], max_redirs=max_redirs - 1)
         return headers, body
 
     if "transfer-encoding" in headers:
         if headers["transfer-encoding"] == "chunked":
-            # TODO:未確認
             print("transfer-encoding: chunked!")
-            body = unchunked(response)
+            body_b = unchunked(response)
         else:
             raise Exception(
                 "Unsupported transfer-encoding: {}".format(headers["transfer-encoding"])
             )
     else:
-        body = response.read()
+        body_b = response.read()
 
     if "content-encoding" in headers:
         assert headers["content-encoding"] == "gzip"
         # gzip形式のデータをTransfer-Encodingのチャンクで受信する
         print("gziped file!")
-        body = gzip.decompress(body)
+        body_b = gzip.decompress(body_b)
 
-    body = body.decode("utf-8")
+    body = body_b.decode("utf-8")
     sock.close()
     return headers, body
 
