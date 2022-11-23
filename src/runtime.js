@@ -9,6 +9,14 @@ document = {
 
 LISTENERS = {}
 
+function Event(type) {
+  this.type = type
+  this.do_default = true;
+}
+
+Event.prototype.preventDefault = function () {
+  this.do_default = false;
+}
 function Node(handle) {
   this.handle = handle;
 }
@@ -31,12 +39,16 @@ Object.defineProperty(Node.prototype, 'innerHTML', {
   }
 });
 
-Node.prototype.dispatchEvent = function (type) {
+Node.prototype.dispatchEvent = function (evt) {
+  var type = evt.type;
   var handle = this.handle;
   var list = (LISTENERS[handle] && LISTENERS[handle][type]) || [];
   for (var i = 0; i < list.length; i++) {
-    list[i].call(this);
+    list[i].call(this, evt);
   }
+
+  return evt.do_default;
 }
+
 
 console.log("Hi from JavaScript!");

@@ -162,7 +162,8 @@ class Tab:
             canvas.create_line(x, y, x, y + obj.height)
 
     def submit_form(self, elt: Element):
-        self.js.dispatch_event("submit", elt)
+        if self.js.dispatch_event("submit", elt):
+            return
         inputs: List[Element] = [
             node
             for node in tree_to_list(elt, [])
@@ -195,16 +196,19 @@ class Tab:
                 pass
             elif isinstance(elt, Element):
                 if elt.tag == "a" and "href" in elt.attributes:
-                    self.js.dispatch_event("click", elt)
+                    if self.js.dispatch_event("click", elt):
+                        return
                     url = resolve_url(elt.attributes["href"], self.url)
                     return self.load(url)
                 elif elt.tag == "input":
-                    self.js.dispatch_event("click", elt)
+                    if self.js.dispatch_event("click", elt):
+                        return
                     self.forcus = elt
                     elt.attributes["value"] = ""
                     return self.render()
                 elif elt.tag == "button":
-                    self.js.dispatch_event("click", elt)
+                    if self.js.dispatch_event("click", elt):
+                        return
                     while elt:
                         if (
                             isinstance(elt, Element)
@@ -219,7 +223,8 @@ class Tab:
 
     def keypress(self, char: str):
         if self.forcus:
-            self.js.dispatch_event("keydown", self.forcus)
+            if self.js.dispatch_event("keydown", self.forcus):
+                return
             self.forcus.attributes["value"] += char
             self.render()
 
