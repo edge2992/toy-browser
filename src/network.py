@@ -78,11 +78,6 @@ def _get_headers_and_body(
 ):
     sock.connect((host, port))
 
-    if scheme == "http":
-        sock.send("{} {} HTTP/1.0\r\n".format(method, path).encode("utf-8"))
-    else:
-        sock.send("{} {} HTTP/1.1\r\n".format(method, path).encode("utf-8"))
-
     headers: Dict[str, str] = {}
     headers["Host"] = host
     headers[
@@ -94,14 +89,13 @@ def _get_headers_and_body(
         assert payload is not None
         headers["Content-Length"] = str(len(payload.encode("utf-8")))
 
-    sock.send(
-        "\r\n".join("{}: {}".format(k, v) for k, v in headers.items()).encode("utf-8")
-    )
-    sock.send("\r\n".encode("utf-8"))
-    if payload:
-        sock.send(payload.encode("utf-8"))
+    version = "HTTP/1.1" if scheme == "https" else "HTTP/1.0"
 
-    sock.send("\r\n".encode("utf-8"))
+    body = "{} {} {}\r\n".format(method, path, version)
+    body += "\r\n".join("{}: {}".format(k, v) for k, v in headers.items()) + "\r\n"
+    body += "\r\n" + (payload or "")
+
+    sock.send(body.encode("utf-8"))
 
     response = sock.makefile("rb", newline="\r\n")
     statusline = response.readline().decode("utf-8")

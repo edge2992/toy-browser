@@ -5,14 +5,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: 現在のファイル",
-            "type": "python",
-            "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
-            "justMyCode": true
-        },
-        {
             "name": "Python: styles section",
             "type": "python",
             "request": "launch",
@@ -33,6 +25,17 @@
             "args": [
                 "https://example.org/"
             ]
-        }
+        },
+        {
+            "name": "Python: localhost:8000",
+            "type": "python",
+            "request": "launch",
+            "program": "src/graphics.py",
+            "console": "integratedTerminal",
+            "justMyCode": true,
+            "args": [
+                "http://localhost:8000/"
+            ]
+        },
     ]
 }

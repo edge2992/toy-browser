@@ -137,7 +137,7 @@ class Tab:
             obj = [
                 obj
                 for obj in tree_to_list(self.document, [])
-                if obj.node == self.forcus and isinstance(obj, InputLayout)
+                if isinstance(obj, InputLayout) and obj.node == self.forcus
             ][0]
             text = self.forcus.attributes.get("value", "")
             x = obj.x + obj.font.measure(text)
@@ -162,6 +162,7 @@ class Tab:
         self.load(url, body)
 
     def click(self, x, y):
+        self.forcus = None
         y += self.scroll
         objs: List[LayoutObject] = [
             obj
