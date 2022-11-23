@@ -8,6 +8,7 @@ black = "*"
 pytest = "*"
 tqdm = "*"
 pytest-mock = "*"
+dukpy = "*"
 
 [dev-packages]
 
