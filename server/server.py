@@ -40,7 +40,7 @@ def show_comments(session: Dict) -> str:
     else:
         out += "<a href=/login>Sign in to write in the guest book</a>"
     for entry, who in ENTRIES:
-        out += "<p>{entry}\n<i>by {who}</i></p>"
+        out += "<p>{entry}\n<i>by {who}</i></p>".format(entry=entry, who=who)
 
     return out
 

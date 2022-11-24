@@ -3,6 +3,8 @@ import socket
 import ssl
 from typing import Dict, List, Tuple, Union
 
+COOKIE_JAR: Dict[str, str] = {}
+
 
 def request(
     url: str, payload: Union[str, None] = None, max_redirs: int = 50
@@ -93,6 +95,9 @@ def _get_headers_and_body(
 
     body = "{} {} {}\r\n".format(method, path, version)
     body += "\r\n".join("{}: {}".format(k, v) for k, v in headers.items()) + "\r\n"
+    if host in COOKIE_JAR:
+        cookie = COOKIE_JAR[host]
+        body += "Cookie: {}\r\n".format(cookie)
     body += "\r\n" + (payload or "")
 
     sock.send(body.encode("utf-8"))
@@ -115,6 +120,10 @@ def _get_headers_and_body(
     if "location" in headers:
         headers, body, option = request(headers["location"], max_redirs=max_redirs - 1)
         return headers, body
+
+    if "set-cookie" in headers:
+        kv = headers["set-cookie"]
+        COOKIE_JAR[host] = kv
 
     if "transfer-encoding" in headers:
         if headers["transfer-encoding"] == "chunked":
