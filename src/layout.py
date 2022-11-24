@@ -182,15 +182,15 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
         previous: Union[InlineLayout, BlockLayout, None] = None
         # create child layout object
         for child in self.node.children:
+            if isinstance(child, Element) and child.tag == "head":
+                continue  # headを飛ばす
             next: Union[InlineLayout, BlockLayout]
-            mode = child.display
-            if mode == LAYOUT_MODE.INLINE:
+            if child.display == LAYOUT_MODE.INLINE:
                 next = InlineLayout(child, self, previous, self.font_ratio)
-            elif mode == LAYOUT_MODE.BLOCK:
+            elif child.display == LAYOUT_MODE.BLOCK:
                 next = BlockLayout(child, self, previous, self.font_ratio)
             else:
-                # headを飛ばす
-                continue
+                raise ValueError("Unknown display mode")
             self.children.append(next)
             previous = next
         # width, x, yをparentとpreviousを参考に計算する

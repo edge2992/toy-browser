@@ -82,6 +82,6 @@ def test_layout_tree_head(example_org_body, sorted_default_rules):
     # print_tree(nodes)
     document = DocumentLayout(nodes)
     document.layout()
-    body = document.children[0].children[1]
+    body = document.children[0].children[0]
     assert body.node.tag == "body"
     print_tree(document)
