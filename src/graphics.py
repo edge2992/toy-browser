@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum, auto
 import sys
 import tkinter
 import tkinter.font
@@ -291,6 +292,12 @@ class Tab:
         return "Tab"
 
 
+class Forcus(Enum):
+    ADDRESS_BAR = auto()
+    CONTENT = auto()
+    NONE = auto()
+
+
 class Browser:
     def __init__(self):
         self.width = WIDTH
@@ -299,7 +306,7 @@ class Browser:
         self.vstep = VSTEP
         self.tabs: List[Tab] = []  # type: ignore
         self.active_tab: Union[None, int] = None  # type: ignore
-        self.forcus = None
+        self.forcus: Forcus = Forcus.NONE
         self.address_bar = ""
 
         self.window = tkinter.Tk()
@@ -388,7 +395,7 @@ class Browser:
         self.canvas.create_rectangle(
             70, 50, self.width - 10, 90, outline="black", width=1
         )
-        if self.forcus == "address_bar":
+        if self.forcus == Forcus.ADDRESS_BAR:
             self.canvas.create_text(
                 85,
                 55,
@@ -408,7 +415,7 @@ class Browser:
             )
 
     def handle_click(self, e: tkinter.Event):
-        self.forcus = None
+        self.forcus = Forcus.NONE
         if e.y < CHROME_PX:
             if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
                 print("active tab click", e.x, e.y)
@@ -426,16 +433,16 @@ class Browser:
                 self.tabs[self.active_tab].go_forward()
             elif 80 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
                 print("address bar click", e.x, e.y)
-                self.forcus = "address_bar"
+                self.forcus = Forcus.ADDRESS_BAR
                 self.address_bar = ""
         else:
             assert self.active_tab is not None
-            self.forcus = "content"
+            self.forcus = Forcus.CONTENT
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
         self.draw()
 
     def handle_middle_click(self, e: tkinter.Event):
-        self.forcus = None
+        self.forcus = Forcus.NONE
         if e.y < CHROME_PX:
             if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
                 # TODO: delete tab
@@ -469,28 +476,28 @@ class Browser:
         if not (0x20 <= ord(e.char) < 0x7F):
             return
 
-        if self.forcus == "address_bar":
+        if self.forcus == Forcus.ADDRESS_BAR:
             self.address_bar += e.char
             self.draw()
-        elif self.forcus == "content":
+        elif self.forcus == Forcus.CONTENT:
             assert self.active_tab is not None
             self.tabs[self.active_tab].keypress(e.char)
             self.draw()
 
     def handle_backspace(self, e: tkinter.Event):
-        if self.forcus == "address_bar":
+        if self.forcus == Forcus.ADDRESS_BAR:
             self.address_bar = self.address_bar[:-1]
             self.draw()
-        elif self.forcus == "content":
+        elif self.forcus == Forcus.CONTENT:
             assert self.active_tab is not None
             self.tabs[self.active_tab].backspace()
             self.draw()
 
     def handle_return(self, e: tkinter.Event):
-        if self.forcus == "address_bar":
+        if self.forcus == Forcus.ADDRESS_BAR:
             assert self.active_tab is not None
             self.tabs[self.active_tab].load(self.address_bar)
-            self.forcus = None
+            self.forcus = Forcus.NONE
             self.draw()
 
     def handle_down(self, e: tkinter.Event):
