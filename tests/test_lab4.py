@@ -47,7 +47,7 @@ def test_htmlParser6():
 
 
 def test_layout(mocker):
-    from src.graphics import Browser
+    from src.graphics.browser import Browser
     from src.draw import DrawText
 
     with mocker.patch(

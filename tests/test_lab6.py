@@ -143,7 +143,7 @@ def test_style2():
 
 
 def test_priority(mocker):
-    from src.graphics import Browser
+    from src.graphics.browser import Browser
 
     with mocker.patch(
         "src.network._get_headers_and_body",
