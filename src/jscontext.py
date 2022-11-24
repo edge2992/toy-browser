@@ -1,9 +1,14 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Dict, List, Union
+
 import dukpy
+
 from src.cssparser import CSSParser
+from src.network import request
 from src.text import Element, HTMLParser
 from src.util.node import tree_to_list
+from src.util.url import resolve_url, url_origin
 
 if TYPE_CHECKING:
     from src.graphics import Tab
@@ -19,6 +24,7 @@ class JSContext:
         self.interp.export_function("querySelectorAll", self.querySelectorAll)
         self.interp.export_function("getAttribute", self.getAttribute)
         self.interp.export_function("innerHTML_set", self.innerHTML_set)
+        self.interp.export_function("XMLHttpRequest_send", self.XMLHttpRequest_send)
 
         with open("src/runtime.js") as f:
             self.interp.evaljs(f.read())
@@ -63,3 +69,10 @@ class JSContext:
     def getAttribute(self, handle: int, attr: str) -> Union[str, None]:
         elt = self.handle_to_node[handle]
         return elt.attributes.get(attr, None)
+
+    def XMLHttpRequest_send(self, method: str, url: str, body: Union[str, None]):
+        full_url = resolve_url(self.tab.url, url)
+        if url_origin(full_url) != url_origin(self.tab.url):
+            raise Exception("Cross-origin XHR request not allowed")
+        _, out, _ = request(full_url, body)
+        return out
