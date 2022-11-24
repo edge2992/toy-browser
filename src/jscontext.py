@@ -11,7 +11,7 @@ from src.util.node import tree_to_list
 from src.util.url import resolve_url, url_origin
 
 if TYPE_CHECKING:
-    from src.graphics import Tab
+    from src.graphics.tab import Tab
 
 EVENT_DISPATCH_CODE: str = "new Node(dukpy.handle).dispatchEvent(new Event(dukpy.type))"
 

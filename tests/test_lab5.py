@@ -32,7 +32,7 @@ def test_bigger_parser():
 
 
 def test_layout_tree(mocker):
-    from src.graphics import Browser
+    from src.graphics.browser import Browser
     from src.text import print_tree
     from src.layout import BlockLayout
 

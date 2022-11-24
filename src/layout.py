@@ -5,14 +5,11 @@ from typing import Dict, Generic, List, Tuple, TypeVar, Union
 from src.draw import Draw, DrawRect, DrawText
 from src.text import Element, HTMLNode, Text
 
-WIDTH, HEIGHT = 800, 600
-HSTEP, VSTEP = 13, 18
-INPUT_WIDTH_PX = 200
+from src.global_value import FONT_RATIO, VSTEP, HSTEP, WIDTH, INPUT_WIDTH_PX
+
 FONTS: Dict[
     Tuple[Union[str, None], int, str, str], tkinter.font.Font
 ] = {}  # font cache
-FONT_METRICS: Dict[Tuple[int, str, str], dict] = {}
-FONT_RATIO: float = 0.75
 
 
 def get_font(
@@ -22,13 +19,6 @@ def get_font(
     if key not in FONTS:
         FONTS[key] = tkinter.font.Font(family=family, size=size, weight=weight, slant=slant)  # type: ignore
     return FONTS[key]
-
-
-def get_font_metric(size: int, weight: str, slant: str) -> dict:
-    key = (size, weight, slant)
-    if key not in FONT_METRICS:
-        FONT_METRICS[key] = get_font(None, size, weight, slant).metrics()  # type: ignore
-    return FONT_METRICS[key]
 
 
 BLOCK_ELEMENTS = [
@@ -147,7 +137,6 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
         font_ratio: float = FONT_RATIO,
     ):
         super().__init__(node, parent, previous, font_ratio)
-        self.font_metrics: List[dict] = []
         self.previous_word: Union[TextLayout, InputLayout, None] = None
 
     def layout(self):

@@ -1,5 +1,5 @@
 def test_history_append():
-    from src.graphics import History
+    from src.graphics.history import History
 
     def go_forward(history: History):
         url = history.next()
