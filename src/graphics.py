@@ -1,18 +1,20 @@
 from __future__ import annotations
+import sys
 import tkinter
 import tkinter.font
-import sys
-from typing import List, Union
 import urllib.parse
+from typing import List, Union
+import dukpy
 
+from src.cssparser import CSSParser, style
+from src.draw import Draw
+from src.jscontext import JSContext
 from src.layout import DocumentLayout, InputLayout, LayoutObject, get_font
 from src.network import request
+from src.selector import cascade_priority
 from src.text import Element, HTMLParser, Text
-from src.draw import Draw
-from src.cssparser import style, CSSParser
 from src.util.node import tree_to_list
 from src.util.url import resolve_url
-from src.selector import cascade_priority
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -81,6 +83,21 @@ class Tab:
         self.url = url
         self.nodes = HTMLParser(body).parse()
         self.rules = self._rules()
+
+        scripts = [
+            node.attributes["src"]
+            for node in tree_to_list(self.nodes, [])
+            if isinstance(node, Element)
+            and node.tag == "script"
+            and "src" in node.attributes
+        ]
+        self.js = JSContext(self)
+        for script in scripts:
+            header, body, _ = request(resolve_url(script, self.url))
+            try:
+                self.js.run(body)
+            except dukpy.JSRuntimeError as e:
+                print("Script", script, "crashed", e)
         self.render()
 
     def _rules(self):
@@ -145,6 +162,8 @@ class Tab:
             canvas.create_line(x, y, x, y + obj.height)
 
     def submit_form(self, elt: Element):
+        if self.js.dispatch_event("submit", elt):
+            return
         inputs: List[Element] = [
             node
             for node in tree_to_list(elt, [])
@@ -176,14 +195,20 @@ class Tab:
             if isinstance(elt, Text):
                 pass
             elif isinstance(elt, Element):
-                if "href" in elt.attributes:
+                if elt.tag == "a" and "href" in elt.attributes:
+                    if self.js.dispatch_event("click", elt):
+                        return
                     url = resolve_url(elt.attributes["href"], self.url)
                     return self.load(url)
                 elif elt.tag == "input":
+                    if self.js.dispatch_event("click", elt):
+                        return
                     self.forcus = elt
                     elt.attributes["value"] = ""
                     return self.render()
                 elif elt.tag == "button":
+                    if self.js.dispatch_event("click", elt):
+                        return
                     while elt:
                         if (
                             isinstance(elt, Element)
@@ -198,6 +223,8 @@ class Tab:
 
     def keypress(self, char: str):
         if self.forcus:
+            if self.js.dispatch_event("keydown", self.forcus):
+                return
             self.forcus.attributes["value"] += char
             self.render()
 

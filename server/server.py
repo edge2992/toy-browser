@@ -16,8 +16,14 @@ ENTRIES = ["Pavel was here"]
 
 def show_comments() -> str:
     out = "<!dotctype html>"
+    out += "<head>"
+    out += "<link rel='stylesheet' href='/comment.css'>"
+    out += "</head>"
+    out += "<script src=/comment.js></script>"
+    out += "<h1>Guestbook</h1>"
     out += "<form action=add method=post>"
     out += "<p><input name=guest></p>"
+    out += "<label></label>"
     out += "<p><button>Sign the book!</button></p>"
     out += "</form>"
     for entry in ENTRIES:
@@ -37,7 +43,7 @@ def form_decode(body: str) -> Dict:
 
 
 def add_entry(params) -> str:
-    if "guest" in params:
+    if "guest" in params and len(params["guest"]) <= 100:
         ENTRIES.append(params["guest"])
     return show_comments()
 
@@ -53,6 +59,12 @@ def do_request(
 ) -> Tuple[str, str]:
     if method == "GET" and url == "/":
         return "200 OK", show_comments()
+    elif method == "GET" and url == "/comment.js":
+        with open("server/comment.js", "r") as f:
+            return "200 OK", f.read()
+    elif method == "GET" and url == "/comment.css":
+        with open("server/comment.css", "r") as f:
+            return "200 OK", f.read()
     elif method == "POST" and url == "/add":
         assert body is not None
         params = form_decode(body)
