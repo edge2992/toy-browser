@@ -1,5 +1,5 @@
 from typing import List, Tuple, Union
-from src.layout import Element, HTMLNode
+from src.text import HTMLNode, Element
 from src.selector import (
     CSSRule,
     ClassSelector,
