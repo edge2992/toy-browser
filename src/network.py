@@ -3,9 +3,14 @@ import socket
 import ssl
 from typing import Dict, List, Tuple, Union
 
+COOKIE_JAR: Dict[str, Tuple[str, Dict]] = {}
+
 
 def request(
-    url: str, payload: Union[str, None] = None, max_redirs: int = 50
+    url: str,
+    top_level_url: Union[str, None],
+    payload: Union[str, None] = None,
+    max_redirs: int = 50,
 ) -> Tuple[Dict[str, str], str, List[str]]:
     if max_redirs == 0:
         raise Exception("Too many redirects")
@@ -57,11 +62,19 @@ def request(
             ctx = ssl.create_default_context()
             with ctx.wrap_socket(sock, server_hostname=host) as ssock:
                 headers, body = _get_headers_and_body(
-                    ssock, method, host, port, path, scheme, payload, max_redirs
+                    ssock,
+                    method,
+                    host,
+                    port,
+                    path,
+                    scheme,
+                    top_level_url,
+                    payload,
+                    max_redirs,
                 )
                 return headers, body, option
         headers, body = _get_headers_and_body(
-            sock, method, host, port, path, scheme, payload, max_redirs
+            sock, method, host, port, path, scheme, top_level_url, payload, max_redirs
         )
         return headers, body, option
 
@@ -73,6 +86,7 @@ def _get_headers_and_body(
     port: int,
     path: str,
     scheme: str,
+    top_level_url: Union[str, None],
     payload: Union[str, None],
     max_redirs: int,
 ):
@@ -93,6 +107,16 @@ def _get_headers_and_body(
 
     body = "{} {} {}\r\n".format(method, path, version)
     body += "\r\n".join("{}: {}".format(k, v) for k, v in headers.items()) + "\r\n"
+    if host in COOKIE_JAR:
+        cookie, params = COOKIE_JAR[host]
+        allow_cookie: bool = True
+        if top_level_url and params.get("samesite", "none") == "lax":
+            _, _, top_level_host, _ = top_level_url.split("/", 3)
+            if ":" in top_level_host:
+                top_level_host, _ = top_level_host.split(":", 1)
+            allow_cookie = host == top_level_host or method == "GET"
+        if allow_cookie:
+            body += "Cookie: {}\r\n".format(cookie)
     body += "\r\n" + (payload or "")
 
     sock.send(body.encode("utf-8"))
@@ -113,8 +137,21 @@ def _get_headers_and_body(
         headers[header.lower()] = value.strip()
 
     if "location" in headers:
-        headers, body, option = request(headers["location"], max_redirs=max_redirs - 1)
+        headers, body, option = request(
+            headers["location"], headers["location"], max_redirs=max_redirs - 1
+        )
         return headers, body
+
+    if "set-cookie" in headers:
+        params = {}
+        if ";" in headers["set-cookie"]:
+            cookie, rest = headers["set-cookie"].split(";", 1)
+            for param_pair in rest.split(";"):
+                name, value = param_pair.split("=", 1)
+                params[name.lower()] = value.lower()
+        else:
+            cookie = headers["set-cookie"]
+        COOKIE_JAR[host] = (cookie, params)
 
     if "transfer-encoding" in headers:
         if headers["transfer-encoding"] == "chunked":
@@ -206,7 +243,7 @@ def lex(body: str) -> str:
 
 
 def load(url: str) -> None:
-    headers, body, option = request(url)
+    headers, body, option = request(url, url)
     show(body, option)
 
 

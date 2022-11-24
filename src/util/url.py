@@ -13,3 +13,8 @@ def resolve_url(url, current):
                 continue
             dir, _ = dir.rsplit("/", 1)
         return dir + "/" + url
+
+
+def url_origin(url):
+    scheme_colon, _, host, _ = url.split("/", 3)
+    return scheme_colon + "//" + host

@@ -169,7 +169,7 @@ if __name__ == "__main__":
     from src.network import request
     import sys
 
-    headers, body, _ = request(sys.argv[1])
+    headers, body, _ = request(sys.argv[1], sys.argv[1])
     print(body)
     nodes = HTMLParser(body).parse()
     print_tree(nodes)
