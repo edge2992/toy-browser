@@ -31,10 +31,13 @@ def show_comments(session: Dict) -> str:
     out += "</head>"
     out += "<script src=/comment.js></script>"
     if "user" in session:
+        nonce = str(random.random())[2:]
+        session["nonce"] = nonce
         out += "<h1>Hello, " + session["user"] + "</h1>"
         out += "<form action=add method=post>"
         out += "<p><input name=guest></p>"
         out += "<label></label>"
+        out += "<input name=nonce type=hidden value={}>".format(nonce)
         out += "<p><button>Sign the book!</button></p>"
         out += "</form>"
     else:
@@ -79,6 +82,8 @@ def form_decode(body: str) -> Dict:
 
 def add_entry(session: Dict, params: Dict):
     if "user" not in session:
+        return
+    if "nonce" not in session or "nonce" not in params or session["nonce"] != params["nonce"]:
         return
     if "guest" in params and len(params["guest"]) <= 100:
         ENTRIES.append((params["guest"], session["user"]))
