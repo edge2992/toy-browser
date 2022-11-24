@@ -14,7 +14,7 @@ from src.network import request
 from src.selector import cascade_priority
 from src.text import Element, HTMLParser, Text
 from src.util.node import tree_to_list
-from src.util.url import resolve_url
+from src.util.url import resolve_url, url_origin
 
 WIDTH, HEIGHT = 800, 600
 HSTEP, VSTEP = 13, 18
@@ -73,13 +73,19 @@ class Tab:
         self.width = width
         self.height = height
         self.url = None
+        self.allowed_origins: Union[List[str], None] = None
         self.font_ratio = FONT_RATIO
         self.forcus: Union[Element, None] = None
 
     def load(self, url: str, body: Union[str, None] = None):
         self.history.append(url)
-        header, body, _ = request(url, self.url, payload=body)
-        print("header\n", header)
+        headers, body, _ = request(url, self.url, payload=body)
+        print("header\n", headers)
+        self.allowed_origins = None
+        if "content-security-policy" in headers:
+            csp = headers["content-security-policy"].split()
+            if len(csp) > 0 and csp[0] == "default-src":
+                self.allowed_origins = csp[1:]
         self.scroll = 0
         self.url = url
         self.nodes = HTMLParser(body).parse()
@@ -94,6 +100,10 @@ class Tab:
         ]
         self.js = JSContext(self)
         for script in scripts:
+            script_url = resolve_url(script, self.url)
+            if not self.allowed_request(script_url):
+                print("Blocked script", script, "due to CSP")
+                continue
             header, body, _ = request(resolve_url(script, self.url), self.url)
             try:
                 self.js.run(body)
@@ -114,8 +124,12 @@ class Tab:
             and node.attributes.get("rel") == "stylesheet"
         ]
         for link in links:
+            script_url = resolve_url(link, self.url)
+            if not self.allowed_request(script_url):
+                print("Blocked script", link, "due to CSP")
+                continue
             try:
-                _, body, _ = request(resolve_url(link, self.url), self.url)
+                _, body, _ = request(script_url, self.url)
             except Exception as e:
                 print(e)
                 continue
@@ -161,6 +175,9 @@ class Tab:
             x = obj.x + obj.font.measure(text)
             y = obj.y - self.scroll + CHROME_PX
             canvas.create_line(x, y, x, y + obj.height)
+
+    def allowed_request(self, url: str):
+        return self.allowed_origins == None or url_origin(url) in self.allowed_origins
 
     def submit_form(self, elt: Element):
         if self.js.dispatch_event("submit", elt):

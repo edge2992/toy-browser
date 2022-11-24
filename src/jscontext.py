@@ -72,8 +72,10 @@ class JSContext:
 
     def XMLHttpRequest_send(self, method: str, url: str, body: Union[str, None]):
         full_url = resolve_url(self.tab.url, url)
+        assert full_url is not None
+        if not self.tab.allowed_request(full_url):
+            raise Exception("Cross-origin XHR blocked by CSP")
         if url_origin(full_url) != url_origin(self.tab.url):
             raise Exception("Cross-origin XHR request not allowed")
-        assert full_url is not None
         _, out, _ = request(full_url, self.tab.url, body)
         return out

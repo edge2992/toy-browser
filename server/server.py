@@ -31,6 +31,7 @@ def show_comments(session: Dict) -> str:
     out += "<link rel='stylesheet' href='/comment.css'>"
     out += "</head>"
     out += "<script src=/comment.js></script>"
+    out += "<script src=https://example.com/evil.js></script>"  # shold be blocked
     if "user" in session:
         nonce = str(random.random())[2:]
         session["nonce"] = nonce
@@ -161,6 +162,8 @@ def handle_connection(conx: socket.socket):
     response += "Context-Length: {}\r\n".format(len(body.encode("utf-8")))
     if "cookie" not in headers:
         response += "Set-Cookie: token={}; SameSite=Lax\r\n".format(token)
+    csp = "default-src http://localhost:8000"
+    response += "Content-Security-Policy: {}\r\n".format(csp)
     response += "\r\n" + body
     conx.send(response.encode("utf-8"))
     conx.close()
