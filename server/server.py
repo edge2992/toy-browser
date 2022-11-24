@@ -83,7 +83,11 @@ def form_decode(body: str) -> Dict:
 def add_entry(session: Dict, params: Dict):
     if "user" not in session:
         return
-    if "nonce" not in session or "nonce" not in params or session["nonce"] != params["nonce"]:
+    if (
+        "nonce" not in session
+        or "nonce" not in params
+        or session["nonce"] != params["nonce"]
+    ):
         return
     if "guest" in params and len(params["guest"]) <= 100:
         ENTRIES.append((params["guest"], session["user"]))
@@ -153,7 +157,7 @@ def handle_connection(conx: socket.socket):
     response = "HTTP/1.0 {}\r\n".format(status)
     response += "Context-Length: {}\r\n".format(len(body.encode("utf-8")))
     if "cookie" not in headers:
-        response += "Set-Cookie: token={}\r\n".format(token)
+        response += "Set-Cookie: token={}; SameSite=Lax\r\n".format(token)
     response += "\r\n" + body
     conx.send(response.encode("utf-8"))
     conx.close()

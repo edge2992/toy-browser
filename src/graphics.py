@@ -72,12 +72,13 @@ class Tab:
         self.history = History()
         self.width = width
         self.height = height
+        self.url = None
         self.font_ratio = FONT_RATIO
         self.forcus: Union[Element, None] = None
 
     def load(self, url: str, body: Union[str, None] = None):
         self.history.append(url)
-        header, body, _ = request(url, payload=body)
+        header, body, _ = request(url, self.url, payload=body)
         print("header\n", header)
         self.scroll = 0
         self.url = url
@@ -93,7 +94,7 @@ class Tab:
         ]
         self.js = JSContext(self)
         for script in scripts:
-            header, body, _ = request(resolve_url(script, self.url))
+            header, body, _ = request(resolve_url(script, self.url), self.url)
             try:
                 self.js.run(body)
             except dukpy.JSRuntimeError as e:
@@ -114,7 +115,7 @@ class Tab:
         ]
         for link in links:
             try:
-                _, body, _ = request(resolve_url(link, self.url))
+                _, body, _ = request(resolve_url(link, self.url), self.url)
             except Exception as e:
                 print(e)
                 continue
@@ -384,6 +385,7 @@ class Browser:
         else:
             assert self.active_tab is not None
             url = self.tabs[self.active_tab].url
+            assert url is not None
             self.canvas.create_text(
                 85, 55, anchor="nw", text=url, font=buttonfont, fill="black"
             )
