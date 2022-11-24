@@ -1,21 +1,18 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Union
+from src.layout.abstract_child import ChildLayoutObject
 
 from src.global_value import FONT_RATIO
 from src.layout.abstract import LayoutObject
 
 if TYPE_CHECKING:
     from src.draw import Draw
-    from src.layout.input import InputLayout
-    from src.layout.text import TextLayout
     from src.text import HTMLNode
 
 
 class LineLayout(
-    LayoutObject[
-        LayoutObject, Union[LayoutObject, None], Union["TextLayout", "InputLayout"]
-    ]
+    LayoutObject[LayoutObject, Union[LayoutObject, None], ChildLayoutObject]
 ):
     def __init__(
         self,

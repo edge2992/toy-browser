@@ -14,6 +14,7 @@ from src.text import Element, Text
 if TYPE_CHECKING:
     from src.draw import Draw
     from src.text import HTMLNode
+    from src.layout.abstract_child import ChildLayoutObject
 
 
 class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLayout"]):
@@ -25,7 +26,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
         font_ratio: float = FONT_RATIO,
     ):
         super().__init__(node, parent, previous, font_ratio)
-        self.previous_word: Union[TextLayout, InputLayout, None] = None
+        self.previous_word: Union[ChildLayoutObject, None] = None
 
     def layout(self):
         self.width = self.parent.width
