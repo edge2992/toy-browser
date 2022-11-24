@@ -1,6 +1,7 @@
 import random
 import socket
 import urllib.parse
+import html
 from typing import Dict, Tuple, Union
 
 s = socket.socket(
@@ -33,7 +34,7 @@ def show_comments(session: Dict) -> str:
     if "user" in session:
         nonce = str(random.random())[2:]
         session["nonce"] = nonce
-        out += "<h1>Hello, " + session["user"] + "</h1>"
+        out += "<h1>Hello, {}<h1>".format(html.escape(session["user"]))
         out += "<form action=add method=post>"
         out += "<p><input name=guest></p>"
         out += "<label></label>"
@@ -43,7 +44,9 @@ def show_comments(session: Dict) -> str:
     else:
         out += "<a href=/login>Sign in to write in the guest book</a>"
     for entry, who in ENTRIES:
-        out += "<p>{entry}\n<i>by {who}</i></p>".format(entry=entry, who=who)
+        out += "<p>{entry}\n<i>by {who}</i></p>".format(
+            entry=html.escape(entry), who=html.escape(who)
+        )
 
     return out
 
