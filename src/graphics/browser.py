@@ -244,7 +244,7 @@ class Browser:
 
     def handle_resize(self, e: tkinter.Event):
         print("resize")
-        if e.width > 1:
+        if e.width > 1 and (self.width != e.width or self.height != e.height):
             self.width = e.width
             self.height = e.height
             # layout -> paint -> draw
