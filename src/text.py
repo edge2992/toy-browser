@@ -1,8 +1,55 @@
 from __future__ import annotations
 from abc import ABC
+from enum import Enum, auto
 from typing import Dict, Tuple, Union, List
 
 from src.entities import ENTITIES_DICT
+
+
+class LAYOUT_MODE(Enum):
+    INLINE = auto()
+    BLOCK = auto()
+
+
+BLOCK_ELEMENTS = [
+    "html",
+    "body",
+    "article",
+    "section",
+    "nav",
+    "aside",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "hgroup",
+    "header",
+    "footer",
+    "address",
+    "p",
+    "hr",
+    "pre",
+    "blockquote",
+    "ol",
+    "ul",
+    "menu",
+    "li",
+    "dl",
+    "dt",
+    "dd",
+    "figure",
+    "figcaption",
+    "main",
+    "div",
+    "table",
+    "form",
+    "fieldset",
+    "legend",
+    "details",
+    "summary",
+]
 
 
 class HTMLNode(ABC):
@@ -11,6 +58,10 @@ class HTMLNode(ABC):
         self.children: List[HTMLNode] = []
         self.style: Dict[str, str] = {}
 
+    @property
+    def display(self) -> LAYOUT_MODE:
+        raise NotImplementedError
+
 
 class Text(HTMLNode):
     def __init__(self, text: str, parent: Union[HTMLNode, None]):
@@ -18,6 +69,10 @@ class Text(HTMLNode):
         for c in ENTITIES_DICT:
             text = text.replace(c, ENTITIES_DICT[c])
         self.text = text
+
+    @property
+    def display(self) -> LAYOUT_MODE:
+        return LAYOUT_MODE.INLINE
 
     def __repr__(self):
         return repr(self.text)
@@ -30,6 +85,20 @@ class Element(HTMLNode):
         super().__init__(parent)
         self.tag = tag
         self.attributes = attributes
+
+    @property
+    def display(self) -> LAYOUT_MODE:
+        if self.children:
+            for child in self.children:
+                if isinstance(child, Text):
+                    continue
+                elif isinstance(child, Element) and child.tag in BLOCK_ELEMENTS:
+                    return LAYOUT_MODE.BLOCK
+            return LAYOUT_MODE.INLINE
+        elif self.tag == "input":
+            return LAYOUT_MODE.INLINE
+        else:
+            return LAYOUT_MODE.BLOCK
 
     def __repr__(self):
         return "<" + self.tag + ">"

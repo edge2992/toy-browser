@@ -8,7 +8,7 @@
             "name": "Python: styles section",
             "type": "python",
             "request": "launch",
-            "program": "src/graphics.py",
+            "program": "src/graphics/browser.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
@@ -19,7 +19,7 @@
             "name": "Python: example.org",
             "type": "python",
             "request": "launch",
-            "program": "src/graphics.py",
+            "program": "src/graphics/browser.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
@@ -30,7 +30,7 @@
             "name": "Python: localhost:8000",
             "type": "python",
             "request": "launch",
-            "program": "src/graphics.py",
+            "program": "src/graphics/browser.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [

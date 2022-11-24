@@ -2,32 +2,32 @@
 
 
 def test_layout_mode():
-    from src.text import HTMLParser, print_tree
-    from src.layout import layout_mode
+    from src.text import HTMLParser, print_tree, LAYOUT_MODE
 
     parser = HTMLParser("text")
     document_tree = parser.parse()
     print_tree(document_tree)
-    assert layout_mode(document_tree) == "block"  # html
-    assert layout_mode(document_tree.children[0]) == "inline"  # body
-    assert layout_mode(document_tree.children[0].children[0]) == "inline"  # text
+    assert document_tree.display == LAYOUT_MODE.BLOCK  # html
+    assert document_tree.children[0].display == LAYOUT_MODE.INLINE  # body
+    assert document_tree.children[0].children[0].display == LAYOUT_MODE.INLINE  # text
 
 
 def test_bigger_parser():
-    from src.text import HTMLParser, print_tree
-    from src.layout import layout_mode
+    from src.text import HTMLParser, print_tree, LAYOUT_MODE
 
     sample_html = "<div></div><div>text</div><div><div></div>text</div><span></span><span>text</span>"
     parser = HTMLParser(sample_html)
     document_tree = parser.parse()
     print_tree(document_tree)
     assert len(document_tree.children[0].children) == 5
-    assert layout_mode(document_tree.children[0].children[0]) == "block"  # div no child
     assert (
-        layout_mode(document_tree.children[0].children[1]) == "inline"
+        document_tree.children[0].children[0].display == LAYOUT_MODE.BLOCK
+    )  # div no child
+    assert (
+        document_tree.children[0].children[1].display == LAYOUT_MODE.INLINE
     )  # div one text child
     assert (
-        layout_mode(document_tree.children[0].children[2]) == "block"
+        document_tree.children[0].children[2].display == LAYOUT_MODE.BLOCK
     )  # div one text child and one div child
 
 
@@ -53,19 +53,19 @@ def test_layout_tree(mocker):
 
 
 def test_layout_mode2():
-    from src.text import print_tree, HTMLParser
-    from src.layout import layout_mode
+    from src.text import print_tree, HTMLParser, LAYOUT_MODE
 
     sample_html = "<div></div><div>text</div><div><div></div>text</div><span></span><span>text</span>"
     parser = HTMLParser(sample_html)
     document_tree = parser.parse()
     print_tree(document_tree)
-    assert layout_mode(document_tree.children[0]) == "block"
-    assert layout_mode(document_tree.children[0].children[0]) == "block"
-    assert layout_mode(document_tree.children[0].children[1]) == "inline"
-    assert layout_mode(document_tree.children[0].children[2]) == "block"
-    assert layout_mode(document_tree.children[0].children[3]) == "block"
-    assert layout_mode(document_tree.children[0].children[4]) == "inline"
+    body = document_tree.children[0]
+    assert body.display == LAYOUT_MODE.BLOCK
+    assert body.children[0].display == LAYOUT_MODE.BLOCK
+    assert body.children[1].display == LAYOUT_MODE.INLINE
+    assert body.children[2].display == LAYOUT_MODE.BLOCK
+    assert body.children[3].display == LAYOUT_MODE.BLOCK
+    assert body.children[4].display == LAYOUT_MODE.INLINE
 
 
 def test_layout_tree_head(example_org_body, sorted_default_rules):
@@ -82,6 +82,6 @@ def test_layout_tree_head(example_org_body, sorted_default_rules):
     # print_tree(nodes)
     document = DocumentLayout(nodes)
     document.layout()
-    body = document.children[0].children[0]
+    body = document.children[0].children[1]
     assert body.node.tag == "body"
     print_tree(document)

@@ -3,7 +3,7 @@ import tkinter
 import tkinter.font
 from typing import Dict, Generic, List, Tuple, TypeVar, Union
 from src.draw import Draw, DrawRect, DrawText
-from src.text import Element, HTMLNode, Text
+from src.text import LAYOUT_MODE, Element, HTMLNode, Text
 
 from src.global_value import FONT_RATIO, VSTEP, HSTEP, WIDTH, INPUT_WIDTH_PX
 
@@ -19,65 +19,6 @@ def get_font(
     if key not in FONTS:
         FONTS[key] = tkinter.font.Font(family=family, size=size, weight=weight, slant=slant)  # type: ignore
     return FONTS[key]
-
-
-BLOCK_ELEMENTS = [
-    "html",
-    "body",
-    "article",
-    "section",
-    "nav",
-    "aside",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "hgroup",
-    "header",
-    "footer",
-    "address",
-    "p",
-    "hr",
-    "pre",
-    "blockquote",
-    "ol",
-    "ul",
-    "menu",
-    "li",
-    "dl",
-    "dt",
-    "dd",
-    "figure",
-    "figcaption",
-    "main",
-    "div",
-    "table",
-    "form",
-    "fieldset",
-    "legend",
-    "details",
-    "summary",
-]
-
-
-def layout_mode(node: HTMLNode) -> str:
-    if isinstance(node, Element) and node.tag == "head":
-        return "head"
-    if isinstance(node, Text):
-        return "inline"
-    elif node.children:
-        for child in node.children:
-            if isinstance(child, Text):
-                continue
-            if isinstance(child, Element) and child.tag in BLOCK_ELEMENTS:
-                return "block"
-        return "inline"
-    elif isinstance(node, Element) and node.tag == "input":
-        return "inline"
-    else:
-        return "block"
 
 
 PN = TypeVar("PN", bound=Union["LayoutObject", None])  # parent layout node
@@ -242,10 +183,10 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
         # create child layout object
         for child in self.node.children:
             next: Union[InlineLayout, BlockLayout]
-            mode = layout_mode(child)
-            if mode == "inline":
+            mode = child.display
+            if mode == LAYOUT_MODE.INLINE:
                 next = InlineLayout(child, self, previous, self.font_ratio)
-            elif mode == "block":
+            elif mode == LAYOUT_MODE.BLOCK:
                 next = BlockLayout(child, self, previous, self.font_ratio)
             else:
                 # headを飛ばす
