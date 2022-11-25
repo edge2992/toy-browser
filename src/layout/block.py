@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Union
 
+import skia
+
+from src.draw import DrawRRect
 from src.global_value import FONT_RATIO
 from src.layout.abstract import LayoutObject
 from src.layout.inline import InlineLayout
@@ -67,8 +70,20 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
                 print("[warning] unknown height", self.node.style["height"])
 
     def paint(self, display_list: List[Draw]) -> None:
+        cmds = []
+
+        rect = skia.Rect.MakeLTRB(
+            self.x, self.y, self.x + self.width, self.y + self.height
+        )
+        bgcolor = self.node.style.get("background-color", "transparent")
+        if bgcolor != "transparent":
+            radius = float(self.node.style.get("border-radius", "0px")[:-2])
+            cmds.append(DrawRRect(rect, radius, bgcolor))
+
         for child in self.children:
-            child.paint(display_list)
+            child.paint(cmds)
+
+        display_list.extend(cmds)
 
     def __repr__(self):
         return "BlockLayout(x={}, y={}, width={}, height={}, node={})".format(

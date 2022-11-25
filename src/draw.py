@@ -1,6 +1,6 @@
 import skia
 
-from src.util.draw_skia import draw_line, draw_rect, draw_text, linespace
+from src.util.draw_skia import draw_line, draw_rect, draw_text, linespace, parse_color
 
 
 class Draw:
@@ -77,3 +77,18 @@ class DrawLine(Draw):
 
     def __repr__(self) -> str:
         return f"DrawRect({self.color})"
+
+
+class DrawRRect(Draw):
+    def __init__(self, rect: skia.Rect, radius, color):
+        super().__init__(rect.top(), rect.left(), rect.right(), rect.bottom(), color)
+        self.rect = rect
+        self.rrect = skia.RRect.MakeRectXY(rect, radius, radius)
+        self.color = color
+
+    def execute(self, scroll, canvas):
+        sk_color = parse_color(self.color)
+        canvas.drawRRect(self.rrect, paint=skia.Paint(Color=sk_color))
+
+    def __repr__(self) -> str:
+        return f"DrawRRect(top={self.top}, left={self.left}, right={self.right}, bottom={self.bottom}, color={self.color})"
