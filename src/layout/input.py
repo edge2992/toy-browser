@@ -7,9 +7,9 @@ from src.draw import DrawRRect, DrawText
 from src.global_value import FONT_RATIO, INPUT_WIDTH_PX
 from src.layout.line import LineLayout
 from src.text import Element, Text
+import skia
 
 if TYPE_CHECKING:
-    import skia
 
     from src.draw import Draw
     from src.text import HTMLNode

@@ -4,6 +4,8 @@ import skia
 def parse_color(color):
     if color == "white":
         return skia.ColorWHITE
+    elif color == "black":
+        return skia.ColorBLACK
     elif color == "lightblue":
         return skia.ColorSetARGB(0xFF, 0xAD, 0xD8, 0xE6)
     elif color == "orange":
@@ -16,6 +18,8 @@ def parse_color(color):
         return skia.ColorBLUE
     elif color == "gray":
         return skia.ColorGRAY
+    elif color == "lightgray":
+        return skia.ColorSetARGB(0xFF, 0xD3, 0xD3, 0xD3)
     elif color == "lightgreen":
         return skia.ColorSetARGB(0xFF, 0x90, 0xEE, 0x90)
     elif isinstance(color, str) and color.startswith("#") and len(color) == 7:

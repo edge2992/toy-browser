@@ -90,7 +90,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
         line.children.append(input)
         self.previous_word = input
         font = self.get_font(node)
-        self.cursor_x += w + font.meatureText(" ")
+        self.cursor_x += w + font.measureText(" ")
 
     def paint(self, display_list: List[Draw]) -> None:
         cmds = []
