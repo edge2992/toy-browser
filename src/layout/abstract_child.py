@@ -4,6 +4,7 @@ from src.layout.abstract import LayoutObject
 
 from src.text import HTMLNode
 from src.draw import Draw
+from src.util.draw_skia import linespace
 
 if TYPE_CHECKING:
     import skia
@@ -35,7 +36,7 @@ class ChildLayoutObject(
         else:
             self.x = self.parent.x
 
-        self.height = -self.font.getMetrics().fAscent + self.font.getMetrics().fDescent
+        self.height = linespace(self.font)
 
     def paint(self, display_list: List[Draw]):
         raise NotImplementedError

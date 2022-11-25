@@ -1,6 +1,6 @@
 import skia
 
-from src.util.draw_skia import draw_line, draw_rect, draw_text
+from src.util.draw_skia import draw_line, draw_rect, draw_text, linespace
 
 
 class Draw:
@@ -21,7 +21,7 @@ class DrawText(Draw):
             y1,
             x1,
             x1,
-            y1 - font.getMetrics().fAscent + font.getMetrics().fDescent,
+            y1 + linespace(font),
             color,
         )
         self.rect = skia.Rect.MakeLTRB(x1, y1, self.right, self.bottom)

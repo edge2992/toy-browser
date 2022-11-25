@@ -35,3 +35,8 @@ def draw_rect(canvas, left, top, right, bottom, fill=None, width=1):
         paint.setColor(skia.ColorBLACK)
     rect = skia.Rect.MakeLTRB(left, top, right, bottom)
     canvas.drawRect(rect, paint)
+
+
+def linespace(font: skia.Font):
+    metrics = font.getMetrics()
+    return metrics.fDescent - metrics.fAscent
