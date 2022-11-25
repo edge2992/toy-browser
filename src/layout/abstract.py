@@ -1,6 +1,5 @@
 from __future__ import annotations
-import tkinter
-import tkinter.font
+import skia
 from typing import Dict, Generic, List, Tuple, TypeVar, Union, TYPE_CHECKING
 
 from src.global_value import FONT_RATIO
@@ -9,18 +8,25 @@ if TYPE_CHECKING:
     from src.draw import Draw
     from src.text import HTMLNode
 
-FONTS: Dict[
-    Tuple[Union[str, None], int, str, str], tkinter.font.Font
-] = {}  # font cache
+FONTS: Dict[Tuple[Union[str, None], str, str], skia.Font] = {}  # font cache
 
 
-def get_font(
-    family: Union[str, None], size: int, weight: str, slant: str
-) -> tkinter.font.Font:
-    key = (family, size, weight, slant)
+def get_font(family: Union[str, None], size: int, weight: str, slant: str) -> skia.Font:
+    key = (family, weight, slant)
     if key not in FONTS:
-        FONTS[key] = tkinter.font.Font(family=family, size=size, weight=weight, slant=slant)  # type: ignore
-    return FONTS[key]
+        if weight == "bold":
+            skia_weight = skia.FontStyle.kBold_Weight
+        else:
+            skia_weight = skia.FontStyle.kNormal_Weight
+        if slant == "italic":
+            skia_style = skia.FontStyle.kItalic_Slant
+        else:
+            skia_style = skia.FontStyle.kUpright_Slant
+        skia_width = skia.FontStyle.kNormal_Width
+        style_info = skia.FontStyle(skia_weight, skia_width, skia_style)
+        font = skia.Typeface("Arial", style_info)
+        FONTS[key] = font
+    return skia.Font(FONTS[key], size)
 
 
 PN = TypeVar("PN", bound=Union["LayoutObject", None])  # parent layout node
@@ -46,7 +52,7 @@ class LayoutObject(Generic[PN, PRN, CN]):
         self.height: int
         self.font_ratio = font_ratio
 
-    def get_font(self, node: HTMLNode) -> tkinter.font.Font:
+    def get_font(self, node: HTMLNode) -> skia.Font:
         weight = node.style["font-weight"]
         style = node.style["font-style"]
         family = node.style["font-family"]
@@ -57,7 +63,8 @@ class LayoutObject(Generic[PN, PRN, CN]):
 
         try:
             font = get_font(family, size, weight, style)
-        except tkinter.TclError as e:
+        except Exception as e:
+            # except tkinter.TclError as e:
             print("[warning]", e)
             font = get_font(None, size, weight, style)
         return font

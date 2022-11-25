@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import tkinter
-import tkinter.font
 import urllib.parse
 from typing import List, Union
 
@@ -9,7 +7,7 @@ import dukpy
 
 from src.graphics.history import History
 from src.cssparser import CSSParser, style
-from src.draw import Draw
+from src.draw import Draw, DrawLine
 from src.jscontext import JSContext
 from src.layout import DocumentLayout, InputLayout, LayoutObject
 from src.network import request
@@ -113,14 +111,6 @@ class Tab:
         self.display_list: List[Draw] = []  # type: ignore
         self.document.paint(self.display_list)
 
-    def draw(self, canvas: tkinter.Canvas):
-        for cmd in self.display_list:
-            if cmd.top > self.scroll + self.height - CHROME_PX:
-                continue
-            if cmd.bottom < self.scroll:
-                continue
-            cmd.execute(self.scroll - CHROME_PX, canvas)
-
         if self.forcus:
             obj = [
                 obj
@@ -128,9 +118,17 @@ class Tab:
                 if isinstance(obj, InputLayout) and obj.node == self.forcus
             ][0]
             text = self.forcus.attributes.get("value", "")
-            x = obj.x + obj.font.measure(text)
+            x = obj.x + obj.font.measureText(text)
             y = obj.y - self.scroll + CHROME_PX
-            canvas.create_line(x, y, x, y + obj.height)
+            self.display_list.append(DrawLine(x, y, x, y + obj.height))
+
+    def draw(self, canvas):
+        for cmd in self.display_list:
+            if cmd.top > self.scroll + self.height - CHROME_PX:
+                continue
+            if cmd.bottom < self.scroll:
+                continue
+            cmd.execute(self.scroll - CHROME_PX, canvas)
 
     def allowed_request(self, url: str):
         return self.allowed_origins == None or url_origin(url) in self.allowed_origins

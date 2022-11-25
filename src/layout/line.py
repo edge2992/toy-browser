@@ -36,7 +36,7 @@ class LineLayout(
             word.layout()
 
         try:
-            max_ascent = max(word.font.metrics("ascent") for word in self.children)
+            max_ascent = max(word.font.getMetrics().fAscent for word in self.children)
         except ValueError as e:
             print("[max_ascent warnings] ", e)
             print("self node", self.node)
@@ -45,10 +45,12 @@ class LineLayout(
 
         baseline = self.y + 1.25 * max_ascent
         for word in self.children:
-            word.y = int(baseline - word.font.metrics("ascent"))
+            word.y = int(baseline - word.font.getMetrics().fAscent)
 
         try:
-            max_descent = max([word.font.metrics("descent") for word in self.children])
+            max_descent = max(
+                [word.font.getMetrics().fDescent for word in self.children]
+            )
         except ValueError as e:
             print("[max_decent warnings] ", e)
             print("self node", self.node)

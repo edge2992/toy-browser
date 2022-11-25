@@ -63,7 +63,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
         font = self.get_font(node)
 
         for word in node.text.split():
-            w = font.measure(word)
+            w = font.measureText(word)
             if self.cursor_x + w > self.width - HSTEP:
                 self.new_line()
             line = self.children[-1]
@@ -71,7 +71,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
             text = TextLayout(node, word, line, self.previous_word, self.font_ratio)
             line.children.append(text)
             self.previous_word = text
-            self.cursor_x += w + font.measure(" ")
+            self.cursor_x += w + font.measureText(" ")
 
     def new_line(self):
         self.previous_word = None
@@ -89,7 +89,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
         line.children.append(input)
         self.previous_word = input
         font = self.get_font(node)
-        self.cursor_x += w + font.measure(" ")
+        self.cursor_x += w + font.meatureText(" ")
 
     def paint(self, display_list: List[Draw]) -> None:
         bgcolor = self.node.style.get("background-color", "transparent")

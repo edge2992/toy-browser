@@ -6,7 +6,7 @@ from src.text import HTMLNode
 from src.draw import Draw
 
 if TYPE_CHECKING:
-    import tkinter.font
+    import skia
     from src.layout.line import LineLayout
 
 
@@ -24,18 +24,18 @@ class ChildLayoutObject(
     ):
         super().__init__(node, parent, previous, font_ratio)
         self.word: str
-        self.font: tkinter.font.Font
+        self.font: skia.Font
 
     def layout(self):
         self.font = self.get_font(self.node)
-        # self.width = self.font.measure(self.word)
+        # self.width = self.font.meatureText(self.word)
         if self.previous:
-            space = self.previous.font.measure(" ")
+            space = self.previous.font.measureText(" ")
             self.x = self.previous.x + space + self.previous.width
         else:
             self.x = self.parent.x
 
-        self.height = self.font.metrics("linespace")
+        self.height = -self.font.getMetrics().fAscent + self.font.getMetrics().fDescent
 
     def paint(self, display_list: List[Draw]):
         raise NotImplementedError

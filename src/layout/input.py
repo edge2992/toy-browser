@@ -9,7 +9,7 @@ from src.layout.line import LineLayout
 from src.text import Element, Text
 
 if TYPE_CHECKING:
-    import tkinter.font
+    import skia
 
     from src.draw import Draw
     from src.text import HTMLNode
@@ -24,7 +24,7 @@ class InputLayout(ChildLayoutObject):
         font_ratio: float = FONT_RATIO,
     ):
         super().__init__(node, parent, previous, font_ratio)
-        self.font: tkinter.font.Font
+        self.font: skia.Font
 
     def layout(self):
         super().layout()
