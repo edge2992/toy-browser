@@ -58,20 +58,6 @@ class Browser:
             self.height,
             sdl2.SDL_WINDOW_SHOWN,
         )
-        # self.window.bind("<Down>", self.handle_down)
-        # self.window.bind("<Up>", self.handle_up)
-        # self.window.bind("<Right>", self.handle_fontup)
-        # self.window.bind("<Left>", self.handle_fontdown)
-        # self.window.bind("<MouseWheel>", self.handle_scroll)
-        # self.window.bind("<Button-1>", self.handle_click)
-        # self.window.bind("<Button-3>", self.handle_middle_click)
-        # self.window.bind("<Key>", self.handle_key)
-        # self.window.bind("<BackSpace>", self.handle_backspace)
-        # self.window.bind("<Return>", self.handle_return)
-        # self.window.bind("<Configure>", self.handle_resize)
-        # For Linux
-        # self.window.bind("<Button-5>", self.scrolldown)
-        # self.window.bind("<Button-4>", self.scrollup)
         with open("src/browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
 
@@ -89,6 +75,7 @@ class Browser:
 
         tabfont = skia.Font(skia.Typeface("Arial"), 20)
         buttonfont = skia.Font(skia.Typeface("Arial"), 30)
+
         self._draw_tab(canvas)
         self._draw_tab_bar(canvas, tabfont, buttonfont)
         self._draw_back_button(canvas)
@@ -174,7 +161,7 @@ class Browser:
             assert url is not None
             draw_text(canvas, 85, 55, url, buttonfont)
 
-    def handle_click(self, e):
+    def handle_click(self, e: sdl2.events.SDL_MouseButtonEvent):
         self.forcus = Forcus.NONE
         if e.y < CHROME_PX:
             if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
@@ -201,7 +188,7 @@ class Browser:
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
         self.draw()
 
-    def handle_middle_click(self, e):
+    def handle_middle_click(self, e: sdl2.events.SDL_MouseButtonEvent):
         self.forcus = Forcus.NONE
         if e.y < CHROME_PX:
             if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
@@ -230,18 +217,18 @@ class Browser:
                 self.load(url)
         self.draw()
 
-    def handle_key(self, e):
-        if len(e.char) == 0:
+    def handle_key(self, key: str):
+        if len(key) == 0:
             return
-        if not (0x20 <= ord(e.char) < 0x7F):
+        if not (0x20 <= ord(key) < 0x7F):
             return
 
         if self.forcus == Forcus.ADDRESS_BAR:
-            self.address_bar += e.char
+            self.address_bar += key
             self.draw()
         elif self.forcus == Forcus.CONTENT:
             assert self.active_tab is not None
-            self.tabs[self.active_tab].keypress(e.char)
+            self.tabs[self.active_tab].keypress(key)
             self.draw()
 
     def handle_backspace(self, e):
@@ -270,11 +257,11 @@ class Browser:
         self.tabs[self.active_tab].scrollup()
         self.draw()
 
-    def handle_scroll(self, e):
-        if e.delta > 0:
-            self.handle_up(e)
+    def handle_scroll(self, delta: float):
+        if delta > 0:
+            self.handle_up(delta)
         else:
-            self.handle_down(e)
+            self.handle_down(delta)
 
     def handle_resize(self, e):
         print("resize")
@@ -315,7 +302,12 @@ if __name__ == "__main__":
                 sdl2.SDL_Quit()
                 sys.exit()
             elif event.type == sdl2.SDL_MOUSEBUTTONUP:
-                browser.handle_click(event.button)
+                if event.button.button == sdl2.SDL_BUTTON_LEFT:
+                    browser.handle_click(event.button)
+                elif event.button.button == sdl2.SDL_BUTTON_MIDDLE:
+                    browser.handle_middle_click(event.button)
+            elif event.type == sdl2.SDL_MOUSEWHEEL:
+                browser.handle_scroll(event.wheel.preciseY)
             elif event.type == sdl2.SDL_KEYDOWN:
                 if event.key.keysym.sym == sdl2.SDLK_RETURN:
                     browser.handle_return(event.key)

@@ -152,7 +152,7 @@ class Tab:
         url = resolve_url(elt.attributes["action"], self.url)
         self.load(url, body)
 
-    def click(self, x, y):
+    def click(self, x: int, y: int):
         self.forcus = None
         y += self.scroll
         objs: List[LayoutObject] = [
