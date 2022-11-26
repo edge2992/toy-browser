@@ -230,8 +230,9 @@ class HTMLParser:
 
 def print_tree(node, indent: int = 0):
     print(" " * indent, node)
-    for child in node.children:
-        print_tree(child, indent + 2)
+    if hasattr(node, "children"):
+        for child in node.children:
+            print_tree(child, indent + 2)
 
 
 if __name__ == "__main__":

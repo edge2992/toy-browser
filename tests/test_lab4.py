@@ -48,12 +48,14 @@ def test_htmlParser6():
 
 def test_layout(mocker):
     from src.graphics.browser import Browser
-    from src.draw import DrawText
+    from src.layer import SaveLayer
+
+    from src.text import print_tree
 
     with mocker.patch(
         "src.network._get_headers_and_body", return_value=("", "<p>text</p>")
     ):
         browser = Browser()
         browser.load("http://test.test/example1")
-        print(browser.tabs[0].display_list)
-        assert isinstance(browser.tabs[0].display_list[0], DrawText)
+        print_tree(browser.tabs[0].display_list[0])
+        assert isinstance(browser.tabs[0].display_list[0], SaveLayer)
