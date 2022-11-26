@@ -48,7 +48,7 @@ def test_htmlParser6():
 
 def test_layout(mocker):
     from src.graphics.browser import Browser
-    from src.layer import SaveLayer
+    from src.draw import SaveLayer
 
     from src.text import print_tree
 

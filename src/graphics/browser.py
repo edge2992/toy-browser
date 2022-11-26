@@ -61,7 +61,7 @@ class Browser:
             self.height,
             sdl2.SDL_WINDOW_SHOWN,
         )
-        with open("src/browser.css") as f:
+        with open("src/browser.css", mode="r") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
 
     def load(self, url: str):

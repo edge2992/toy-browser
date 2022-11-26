@@ -1,8 +1,7 @@
 from __future__ import annotations
 import skia
 from typing import Dict, Generic, List, Tuple, TypeVar, Union, TYPE_CHECKING
-from src.draw import ClipRRect
-from src.layer import SaveLayer
+from src.draw import ClipRRect, SaveLayer
 
 from src.global_value import FONT_RATIO
 from src.util.draw_skia import parse_blend_mode
@@ -82,7 +81,9 @@ class LayoutObject(Generic[PN, PRN, CN]):
         """描画するdisplay_listを作成する"""
         raise NotImplementedError
 
-    def paint_visual_effects(self, node: HTMLNode, cmds: List[Draw], rect) -> List[Draw]:
+    def paint_visual_effects(
+        self, node: HTMLNode, cmds: List[Draw], rect
+    ) -> List[Draw]:
         opacity = float(node.style.get("opacity", "1.0"))
         blend_mode = parse_blend_mode(node.style.get("mix-blend-mode", ""))
 

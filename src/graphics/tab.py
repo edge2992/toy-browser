@@ -21,7 +21,7 @@ from src.global_value import CHROME_PX, FONT_RATIO, SCROLL_STEP
 class Tab:
     def __init__(self, width: float, height: float):
         self.scroll = 0
-        with open("src/browser.css") as f:
+        with open("src/browser.css", mode="r") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
         self.history = History()
         self.width = width
