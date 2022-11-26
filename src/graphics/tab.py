@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import tkinter
-import tkinter.font
 import urllib.parse
 from typing import List, Union
 
@@ -9,7 +7,7 @@ import dukpy
 
 from src.graphics.history import History
 from src.cssparser import CSSParser, style
-from src.draw import Draw
+from src.draw import Draw, DrawLine
 from src.jscontext import JSContext
 from src.layout import DocumentLayout, InputLayout, LayoutObject
 from src.network import request
@@ -21,9 +19,9 @@ from src.global_value import CHROME_PX, FONT_RATIO, SCROLL_STEP
 
 
 class Tab:
-    def __init__(self, width: int, height: int):
+    def __init__(self, width: float, height: float):
         self.scroll = 0
-        with open("src/browser.css") as f:
+        with open("src/browser.css", mode="r") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
         self.history = History()
         self.width = width
@@ -103,6 +101,10 @@ class Tab:
 
         return rules
 
+    def raster(self, canvas):
+        for cmd in self.display_list:
+            cmd.execute(canvas)
+
     def render(self) -> None:
         # layout -> paint
         style(self.nodes, sorted(self.rules, key=cascade_priority))
@@ -113,14 +115,6 @@ class Tab:
         self.display_list: List[Draw] = []  # type: ignore
         self.document.paint(self.display_list)
 
-    def draw(self, canvas: tkinter.Canvas):
-        for cmd in self.display_list:
-            if cmd.top > self.scroll + self.height - CHROME_PX:
-                continue
-            if cmd.bottom < self.scroll:
-                continue
-            cmd.execute(self.scroll - CHROME_PX, canvas)
-
         if self.forcus:
             obj = [
                 obj
@@ -128,9 +122,9 @@ class Tab:
                 if isinstance(obj, InputLayout) and obj.node == self.forcus
             ][0]
             text = self.forcus.attributes.get("value", "")
-            x = obj.x + obj.font.measure(text)
+            x = obj.x + obj.font.measureText(text)
             y = obj.y - self.scroll + CHROME_PX
-            canvas.create_line(x, y, x, y + obj.height)
+            self.display_list.append(DrawLine(x, y, x, y + obj.height))
 
     def allowed_request(self, url: str):
         return self.allowed_origins == None or url_origin(url) in self.allowed_origins
@@ -154,7 +148,7 @@ class Tab:
         url = resolve_url(elt.attributes["action"], self.url)
         self.load(url, body)
 
-    def click(self, x, y):
+    def click(self, x: float, y: float):
         self.forcus = None
         y += self.scroll
         objs: List[LayoutObject] = [

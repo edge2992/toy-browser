@@ -73,10 +73,7 @@ def test_layout_tree_head(example_org_body, sorted_default_rules):
     from src.text import HTMLParser, print_tree
     from src.layout import DocumentLayout
     from src.cssparser import style
-    import tkinter
 
-    # dummy tkinter canvas
-    _ = tkinter.Canvas(tkinter.Tk(), width=800, height=600)
     nodes = HTMLParser(example_org_body).parse()
     style(nodes, sorted_default_rules)
     # print_tree(nodes)

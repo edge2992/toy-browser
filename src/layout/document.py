@@ -15,16 +15,15 @@ class DocumentLayout(LayoutObject):
     def __init__(
         self,
         node: HTMLNode,
-        width: int = WIDTH - 2 * HSTEP,
-        hstep: int = HSTEP,
-        vstep: int = VSTEP,
+        width: float = WIDTH - 2 * HSTEP,
+        hstep: float = HSTEP,
+        vstep: float = VSTEP,
         font_ratio: float = FONT_RATIO,
     ):
         self.node = node
         self.parent: Union[LayoutObject, None] = None
         self.children: List[LayoutObject] = []
         self.width = width
-        self.height: int
         self.x = hstep
         self.y = vstep
         self.font_ratio = font_ratio

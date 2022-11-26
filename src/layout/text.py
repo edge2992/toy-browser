@@ -7,7 +7,7 @@ from src.draw import DrawText
 from src.global_value import FONT_RATIO
 
 if TYPE_CHECKING:
-    import tkinter.font
+    import skia
 
     from src.draw import Draw
     from src.layout.line import LineLayout
@@ -25,11 +25,11 @@ class TextLayout(ChildLayoutObject):
     ):
         super().__init__(node, parent, previous, font_ratio)
         self.word = word
-        self.font: tkinter.font.Font
+        self.font: skia.Font
 
     def layout(self):
         super().layout()
-        self.width = self.font.measure(self.word)
+        self.width = self.font.measureText(self.word)
 
     def paint(self, display_list: List[Draw]) -> None:
         color = self.node.style["color"]

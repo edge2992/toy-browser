@@ -147,8 +147,9 @@ def _get_headers_and_body(
         if ";" in headers["set-cookie"]:
             cookie, rest = headers["set-cookie"].split(";", 1)
             for param_pair in rest.split(";"):
-                name, value = param_pair.split("=", 1)
-                params[name.lower()] = value.lower()
+                if "=" in param_pair:
+                    name, value = param_pair.split("=", 1)
+                    params[name.lower()] = value.lower()
         else:
             cookie = headers["set-cookie"]
         COOKIE_JAR[host] = (cookie, params)

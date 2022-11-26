@@ -5,14 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: styles section",
+            "name": "Python: browser engineer page",
             "type": "python",
             "request": "launch",
             "program": "src/graphics/browser.py",
             "console": "integratedTerminal",
             "justMyCode": true,
             "args": [
-                "https://browser.engineering/styles.html"
+                "https://browser.engineering/visual-effects.html"
             ]
         },
         {

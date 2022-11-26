@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, List, Union
 
-from src.draw import DrawRect
-from src.global_value import FONT_RATIO, HSTEP, INPUT_WIDTH_PX
+import skia
 
+from src.draw import DrawRRect
+from src.global_value import FONT_RATIO, HSTEP, INPUT_WIDTH_PX
 from src.layout.abstract import LayoutObject
 from src.layout.input import InputLayout
 from src.layout.line import LineLayout
@@ -13,8 +14,8 @@ from src.text import Element, Text
 
 if TYPE_CHECKING:
     from src.draw import Draw
-    from src.text import HTMLNode
     from src.layout.abstract_child import ChildLayoutObject
+    from src.text import HTMLNode
 
 
 class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLayout"]):
@@ -63,7 +64,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
         font = self.get_font(node)
 
         for word in node.text.split():
-            w = font.measure(word)
+            w = font.measureText(word)
             if self.cursor_x + w > self.width - HSTEP:
                 self.new_line()
             line = self.children[-1]
@@ -71,7 +72,7 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
             text = TextLayout(node, word, line, self.previous_word, self.font_ratio)
             line.children.append(text)
             self.previous_word = text
-            self.cursor_x += w + font.measure(" ")
+            self.cursor_x += w + font.measureText(" ")
 
     def new_line(self):
         self.previous_word = None
@@ -89,10 +90,15 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
         line.children.append(input)
         self.previous_word = input
         font = self.get_font(node)
-        self.cursor_x += w + font.measure(" ")
+        self.cursor_x += w + font.measureText(" ")
 
     def paint(self, display_list: List[Draw]) -> None:
-        bgcolor = self.node.style.get("background-color", "transparent")
+        cmds = []
+
+        rect = skia.Rect.MakeLTRB(
+            self.x, self.y, self.x + self.width, self.y + self.height
+        )
+
         is_atomic = not isinstance(self.node, Text) and (
             isinstance(self.node, Element)
             and self.node.tag
@@ -103,12 +109,18 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
         )
 
         if not is_atomic:
+            bgcolor = self.node.style.get("background-color", "transparent")
             if bgcolor != "transparent":
-                x2, y2 = self.x + self.width, self.y + self.height
-                display_list.append(DrawRect(self.x, self.y, x2, y2, bgcolor))
+                radius = float(self.node.style.get("border-radius", "0px")[:-2])
+                cmds.append(DrawRRect(rect, radius, bgcolor))
 
         for child in self.children:
-            child.paint(display_list)
+            child.paint(cmds)
+
+        if not is_atomic:
+            cmds = self.paint_visual_effects(self.node, cmds, rect)
+
+        display_list.extend(cmds)
 
     def __repr__(self) -> str:
         return "InlineLayout(x={}, y={}, width={}, height={}, node={})".format(

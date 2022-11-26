@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, List, Union
 
 from src.layout.abstract_child import ChildLayoutObject
-from src.draw import DrawRect, DrawText
+from src.draw import DrawRRect, DrawText
 from src.global_value import FONT_RATIO, INPUT_WIDTH_PX
 from src.layout.line import LineLayout
 from src.text import Element, Text
+import skia
 
 if TYPE_CHECKING:
-    import tkinter.font
 
     from src.draw import Draw
     from src.text import HTMLNode
@@ -24,18 +24,22 @@ class InputLayout(ChildLayoutObject):
         font_ratio: float = FONT_RATIO,
     ):
         super().__init__(node, parent, previous, font_ratio)
-        self.font: tkinter.font.Font
+        self.font: skia.Font
 
     def layout(self):
         super().layout()
         self.width = INPUT_WIDTH_PX
 
     def paint(self, display_list: List[Draw]) -> None:
+        cmds: List[Draw] = []
+
+        rect = skia.Rect.MakeLTRB(
+            self.x, self.y, self.x + self.width, self.y + self.height
+        )
         bgcolor = self.node.style.get("background-color", "transparent")
         if bgcolor != "transparent":
-            x2, y2 = self.x + self.width, self.y + self.height
-            rect = DrawRect(self.x, self.y, x2, y2, bgcolor)
-            display_list.append(rect)
+            radius = float(self.node.style.get("border-radius", "0px")[:-2])
+            cmds.append(DrawRRect(rect, radius, bgcolor))
 
         assert isinstance(self.node, Element)
 
@@ -48,10 +52,11 @@ class InputLayout(ChildLayoutObject):
             raise ValueError("Invalid tag for InputLayout")
 
         color = self.node.style["color"]
-        display_list.append(DrawText(self.x, self.y, text, self.font, color))
+        cmds.append(DrawText(self.x, self.y, text, self.font, color))
 
-        color = self.node.style["color"]
-        display_list.append(DrawText(self.x, self.y, text, self.font, color))
+        cmds = self.paint_visual_effects(self.node, cmds, rect)
+
+        display_list.extend(cmds)
 
     def __repr__(self) -> str:
         return ("InputLayout(x={}, y={}, width={}, height={}, node={})").format(

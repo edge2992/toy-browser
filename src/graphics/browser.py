@@ -1,21 +1,18 @@
 from __future__ import annotations
 
+import ctypes
+import math
 import sys
-import tkinter
-import tkinter.font
 from enum import Enum, auto
-from typing import List, Union
+from typing import List
+
+import sdl2
+import skia
 
 from src.cssparser import CSSParser
-from src.layout import get_font
+from src.global_value import CHROME_PX, HEIGHT, HSTEP, VSTEP, WIDTH
 from src.graphics.tab import Tab
-from src.global_value import (
-    WIDTH,
-    HEIGHT,
-    HSTEP,
-    VSTEP,
-    CHROME_PX,
-)
+from src.util.draw_skia import draw_line, draw_rect, draw_text, parse_color
 
 
 class Forcus(Enum):
@@ -31,30 +28,40 @@ class Browser:
         self.hstep = HSTEP
         self.vstep = VSTEP
         self.tabs: List[Tab] = []  # type: ignore
-        self.active_tab: Union[None, int] = None  # type: ignore
+        self.active_tab: int
         self.forcus: Forcus = Forcus.NONE
         self.address_bar = ""
+        self.chrome_surface = skia.Surface(self.width, CHROME_PX)
+        self.tab_surface: skia.Surface
 
-        self.window = tkinter.Tk()
-        self.window.bind("<Down>", self.handle_down)
-        self.window.bind("<Up>", self.handle_up)
-        self.window.bind("<Right>", self.handle_fontup)
-        self.window.bind("<Left>", self.handle_fontdown)
-        self.window.bind("<MouseWheel>", self.handle_scroll)
-        self.window.bind("<Button-1>", self.handle_click)
-        self.window.bind("<Button-3>", self.handle_middle_click)
-        self.window.bind("<Key>", self.handle_key)
-        self.window.bind("<BackSpace>", self.handle_backspace)
-        self.window.bind("<Return>", self.handle_return)
-        self.window.bind("<Configure>", self.handle_resize)
-        # For Linux
-        # self.window.bind("<Button-5>", self.scrolldown)
-        # self.window.bind("<Button-4>", self.scrollup)
-        self.canvas = tkinter.Canvas(
-            self.window, width=self.width, height=self.height, bg="white"
+        if sdl2.SDL_BYTEORDER == sdl2.SDL_BIG_ENDIAN:
+            self.RED_MASK = 0xFF000000
+            self.GREEN_MASK = 0x00FF0000
+            self.BLUE_MASK = 0x0000FF00
+            self.ALPHA_MASK = 0x000000FF
+        else:
+            self.RED_MASK = 0x000000FF
+            self.GREEN_MASK = 0x0000FF00
+            self.BLUE_MASK = 0x00FF0000
+            self.ALPHA_MASK = 0xFF000000
+
+        self.root_surface = skia.Surface.MakeRaster(
+            skia.ImageInfo.Make(
+                self.width,
+                self.height,
+                ct=skia.kRGBA_8888_ColorType,
+                at=skia.kPremul_AlphaType,
+            )
         )
-        self.canvas.pack(fill=tkinter.BOTH, expand=True)
-        with open("src/browser.css") as f:
+        self.sdl_window = sdl2.SDL_CreateWindow(
+            b"Browser",
+            sdl2.SDL_WINDOWPOS_CENTERED,
+            sdl2.SDL_WINDOWPOS_CENTERED,
+            self.width,
+            self.height,
+            sdl2.SDL_WINDOW_SHOWN,
+        )
+        with open("src/browser.css", mode="r") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
 
     def load(self, url: str):
@@ -63,84 +70,126 @@ class Browser:
         new_tab.load(url)
         self.active_tab = len(self.tabs)
         self.tabs.append(new_tab)
+        self.raster_chrome()
+        self.raster_tab()
         self.draw()
 
+    def raster_tab(self):
+        active_tab = self.tabs[self.active_tab]
+        tab_height = math.ceil(active_tab.document.height)
+
+        if not hasattr(self, "tab_surface") or tab_height != self.tab_surface.height():
+            self.tab_surface = skia.Surface(self.width, tab_height)
+
+        canvas = self.tab_surface.getCanvas()
+        canvas.clear(skia.ColorWHITE)
+        active_tab.raster(canvas)
+
+    def raster_chrome(self):
+        canvas = self.chrome_surface.getCanvas()
+        canvas.clear(skia.ColorWHITE)
+
+        self.__raster_tab_bar(canvas)
+        self.__raster_address_bar(canvas)
+        self.__raster_back_button(canvas)
+        self.__raster_forward_button(canvas)
+
     def draw(self):
-        self.canvas.delete("all")
+        canvas = self.root_surface.getCanvas()
+        canvas.clear(skia.ColorWHITE)
 
-        tabfont = get_font(None, 20, "normal", "roman")
-        buttonfont = get_font(None, 30, "normal", "roman")
-        self._draw_tab()
-        self._draw_tab_bar(tabfont, buttonfont)
-        self._draw_back_button()
-        self._draw_forward_button()
-        self._draw_address_bar(buttonfont)
+        tab_rect = skia.Rect.MakeLTRB(0, CHROME_PX, self.width, self.height)
+        tab_offset = CHROME_PX - self.tabs[self.active_tab].scroll
+        canvas.save()
+        canvas.clipRect(tab_rect)
+        canvas.translate(0, tab_offset)
+        self.tab_surface.draw(canvas, 0, 0)
+        canvas.restore()
 
-    def _draw_tab(self):
-        # タブの描画
-        assert self.active_tab is not None
-        self.tabs[self.active_tab].draw(self.canvas)
-        self.canvas.create_rectangle(
-            0, 0, self.width, CHROME_PX, fill="white", outline="white"
+        chrome_rect = skia.Rect.MakeLTRB(0, 0, self.width, CHROME_PX)
+        canvas.save()
+        canvas.clipRect(chrome_rect)
+        self.chrome_surface.draw(canvas, 0, 0)
+        canvas.restore()
+
+        # This makes an image interface to the Skia surface, but
+        # doesn't copy the data.
+        skia_image = self.root_surface.makeImageSnapshot()
+        skia_bytes = skia_image.tobytes()
+
+        depth = 32
+        pitch = 4 * self.width
+        sdl_surface = sdl2.SDL_CreateRGBSurfaceFrom(
+            skia_bytes,
+            self.width,
+            self.height,
+            depth,
+            pitch,
+            self.RED_MASK,
+            self.GREEN_MASK,
+            self.BLUE_MASK,
+            self.ALPHA_MASK,
         )
+        rect = sdl2.SDL_Rect(0, 0, self.width, self.height)
+        window_surface = sdl2.SDL_GetWindowSurface(self.sdl_window)
+        # SDL_BlitSurface its what actually does the copy
+        sdl2.SDL_BlitSurface(sdl_surface, rect, window_surface, rect)
+        sdl2.SDL_UpdateWindowSurface(self.sdl_window)
 
-    def _draw_tab_bar(self, tabfont, buttonfont):
+    def __raster_tab_bar(self, canvas):
         # タブバーの描画
+        tabfont = skia.Font(skia.Typeface("Arial"), 20)
+        buttonfont = skia.Font(skia.Typeface("Arial"), 30)
+
         for i, tab in enumerate(self.tabs):
             name = "Tab {}".format(i)
             x1, x2 = 40 + 80 * i, 120 + 80 * i
-            self.canvas.create_line(x1, 0, x1, 40, fill="black")
-            self.canvas.create_line(x2, 0, x2, 40, fill="black")
-            self.canvas.create_text(
-                x1 + 10, 10, anchor="nw", text=name, font=tabfont, fill="black"
-            )
+            draw_line(canvas, x1, 0, x1, 40)
+            draw_line(canvas, x2, 0, x2, 40)
+            draw_text(canvas, x1 + 10, 10, name, tabfont)
             if i == self.active_tab:
-                self.canvas.create_line(0, 40, x1, 40, fill="black")
-                self.canvas.create_line(x2, 40, self.width, 40, fill="black")
-        self.canvas.create_rectangle(10, 10, 30, 30, outline="black", width=1)
-        self.canvas.create_text(
-            11, 0, anchor="nw", text="+", font=buttonfont, fill="black"
-        )
+                draw_line(canvas, 0, 40, x1, 40)
+                draw_line(canvas, x2, 40, self.width, 40)
 
-    def _draw_back_button(self):
+        draw_rect(canvas, 10, 10, 30, 30)
+        draw_text(canvas, 11, 4, "+", buttonfont)
+
+    def __raster_back_button(self, canvas):
         # 戻るボタンの描画
-        assert self.active_tab is not None
-        self.canvas.create_rectangle(10, 50, 35, 90, outline="black", width=1)
+        draw_rect(canvas, 10, 50, 35, 90)
         fill = "black" if self.tabs[self.active_tab].history.has_previous() else "gray"
-        self.canvas.create_polygon(16, 70, 30, 55, 30, 85, fill=fill)
+        path = skia.Path().moveTo(15, 70).lineTo(30, 55).lineTo(30, 85)
+        paint = skia.Paint(Color=parse_color(fill), Style=skia.Paint.kFill_Style)
+        canvas.drawPath(path, paint)
 
-    def _draw_forward_button(self):
+    def __raster_forward_button(self, canvas):
         # 進むボタンの描画
-        assert self.active_tab is not None
-        self.canvas.create_rectangle(40, 50, 65, 90, outline="black", width=1)
+        draw_rect(canvas, 40, 50, 65, 90)
         fill = "black" if self.tabs[self.active_tab].history.has_next() else "gray"
-        self.canvas.create_polygon(45, 55, 59, 70, 45, 85, fill=fill)
+        path = skia.Path().moveTo(45, 55).lineTo(59, 70).lineTo(45, 85)
+        paint = skia.Paint(Color=parse_color(fill), Style=skia.Paint.kFill_Style)
+        canvas.drawPath(path, paint)
 
-    def _draw_address_bar(self, buttonfont):
+    def __raster_address_bar(self, canvas):
         # アドレスバーの描画
-        self.canvas.create_rectangle(
-            70, 50, self.width - 10, 90, outline="black", width=1
-        )
+        buttonfont = skia.Font(skia.Typeface("Arial"), 30)
+
+        draw_rect(canvas, 70, 50, self.width - 10, 90)
         if self.forcus == Forcus.ADDRESS_BAR:
-            self.canvas.create_text(
+            draw_text(
+                canvas,
                 85,
                 55,
-                anchor="nw",
-                text=self.address_bar,
-                font=buttonfont,
-                fill="black",
+                self.address_bar,
+                buttonfont,
             )
-            w = buttonfont.measure(self.address_bar)
-            self.canvas.create_line(85 + w, 55, 85 + w, 90, fill="black")
+            w = buttonfont.measureText(self.address_bar)
+            draw_line(canvas, 85 + w, 55, 85 + w, 90)
         else:
-            assert self.active_tab is not None
             url = self.tabs[self.active_tab].url
-            assert url is not None
-            self.canvas.create_text(
-                85, 55, anchor="nw", text=url, font=buttonfont, fill="black"
-            )
+            draw_text(canvas, 85, 55, url, buttonfont)
 
-    def handle_click(self, e: tkinter.Event):
+    def handle_click(self, e: sdl2.events.SDL_MouseButtonEvent):
         self.forcus = Forcus.NONE
         if e.y < CHROME_PX:
             if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
@@ -161,13 +210,15 @@ class Browser:
                 print("address bar click", e.x, e.y)
                 self.forcus = Forcus.ADDRESS_BAR
                 self.address_bar = ""
+            self.raster_chrome()
         else:
             assert self.active_tab is not None
             self.forcus = Forcus.CONTENT
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
+            self.raster_tab()
         self.draw()
 
-    def handle_middle_click(self, e: tkinter.Event):
+    def handle_middle_click(self, e: sdl2.events.SDL_MouseButtonEvent):
         self.forcus = Forcus.NONE
         if e.y < CHROME_PX:
             if 40 <= e.x < 40 + 80 * len(self.tabs) and 0 <= e.y < 40:
@@ -189,28 +240,30 @@ class Browser:
                     self.load(url)
             elif 80 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
                 pass
+            self.raster_chrome()
         else:
             assert self.active_tab is not None
             url = self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
             if url is not None:
                 self.load(url)
+            self.raster_tab()
         self.draw()
 
-    def handle_key(self, e: tkinter.Event):
-        if len(e.char) == 0:
+    def handle_key(self, key: str):
+        if len(key) == 0:
             return
-        if not (0x20 <= ord(e.char) < 0x7F):
+        if not (0x20 <= ord(key) < 0x7F):
             return
 
         if self.forcus == Forcus.ADDRESS_BAR:
-            self.address_bar += e.char
+            self.address_bar += key
             self.draw()
         elif self.forcus == Forcus.CONTENT:
             assert self.active_tab is not None
-            self.tabs[self.active_tab].keypress(e.char)
+            self.tabs[self.active_tab].keypress(key)
             self.draw()
 
-    def handle_backspace(self, e: tkinter.Event):
+    def handle_backspace(self, e):
         if self.forcus == Forcus.ADDRESS_BAR:
             self.address_bar = self.address_bar[:-1]
             self.draw()
@@ -219,30 +272,30 @@ class Browser:
             self.tabs[self.active_tab].backspace()
             self.draw()
 
-    def handle_return(self, e: tkinter.Event):
+    def handle_return(self, e):
         if self.forcus == Forcus.ADDRESS_BAR:
             assert self.active_tab is not None
             self.tabs[self.active_tab].load(self.address_bar)
             self.forcus = Forcus.NONE
             self.draw()
 
-    def handle_down(self, e: tkinter.Event):
+    def handle_down(self, e):
         assert self.active_tab is not None
         self.tabs[self.active_tab].scrolldown()
         self.draw()
 
-    def handle_up(self, e: tkinter.Event):
+    def handle_up(self, e):
         assert self.active_tab is not None
         self.tabs[self.active_tab].scrollup()
         self.draw()
 
-    def handle_scroll(self, e: tkinter.Event):
-        if e.delta > 0:
-            self.handle_up(e)
+    def handle_scroll(self, delta: float):
+        if delta > 0:
+            self.handle_up(delta)
         else:
-            self.handle_down(e)
+            self.handle_down(delta)
 
-    def handle_resize(self, e: tkinter.Event):
+    def handle_resize(self, e):
         print("resize")
         if e.width > 1 and (self.width != e.width or self.height != e.height):
             self.width = e.width
@@ -253,20 +306,52 @@ class Browser:
                 tab.resize(self.width, self.height)
             self.draw()
 
-    def handle_fontup(self, e: tkinter.Event):
+    def handle_fontup(self, e):
         print("fontup")
         assert self.active_tab is not None
         self.tabs[self.active_tab].fontup()
         self.draw()
 
-    def handle_fontdown(self, e: tkinter.Event):
+    def handle_fontdown(self, e):
         print("fontdown")
         assert self.active_tab is not None
         self.tabs[self.active_tab].fontdown()
         self.draw()
 
+    def handle_quit(self):
+        sdl2.SDL_DestroyWindow(self.sdl_window)
+
 
 if __name__ == "__main__":
+    sdl2.SDL_Init(sdl2.SDL_INIT_EVENTS)
     browser = Browser()
     browser.load(sys.argv[1])
-    tkinter.mainloop()
+    event = sdl2.SDL_Event()
+    while True:
+        while sdl2.SDL_PollEvent(ctypes.byref(event)) != 0:
+            if event.type == sdl2.SDL_QUIT:
+                browser.handle_quit()
+                sdl2.SDL_Quit()
+                sys.exit()
+            elif event.type == sdl2.SDL_MOUSEBUTTONUP:
+                if event.button.button == sdl2.SDL_BUTTON_LEFT:
+                    browser.handle_click(event.button)
+                elif event.button.button == sdl2.SDL_BUTTON_MIDDLE:
+                    browser.handle_middle_click(event.button)
+            elif event.type == sdl2.SDL_MOUSEWHEEL:
+                browser.handle_scroll(event.wheel.preciseY)
+            elif event.type == sdl2.SDL_KEYDOWN:
+                if event.key.keysym.sym == sdl2.SDLK_RETURN:
+                    browser.handle_return(event.key)
+                elif event.key.keysym.sym == sdl2.SDLK_BACKSPACE:
+                    browser.handle_backspace(event.key)
+                elif event.key.keysym.sym == sdl2.SDLK_DOWN:
+                    browser.handle_down(event.key)
+                elif event.key.keysym.sym == sdl2.SDLK_UP:
+                    browser.handle_up(event.key)
+                elif event.key.keysym.sym == sdl2.SDLK_RIGHT:
+                    browser.handle_fontup(event.key)
+                elif event.key.keysym.sym == sdl2.SDLK_LEFT:
+                    browser.handle_fontdown(event.key)
+            elif event.type == sdl2.SDL_TEXTINPUT:
+                browser.handle_key(event.text.text.decode("utf8"))
