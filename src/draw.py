@@ -4,19 +4,21 @@ from src.util.draw_skia import draw_line, draw_rect, draw_text, linespace, parse
 
 
 class Draw:
-    def __init__(self, top: int, left: int, right: int, bottom: int, color: str):
-        self.top: int = top
-        self.left: int = left
-        self.right: int = right
-        self.bottom: int = bottom
+    def __init__(
+        self, top: float, left: float, right: float, bottom: float, color: str
+    ):
+        self.top: float = top
+        self.left: float = left
+        self.right: float = right
+        self.bottom: float = bottom
         self.color: str = color
 
-    def execute(self, scroll: int, canvas):
+    def execute(self, scroll: float, canvas):
         raise NotImplementedError
 
 
 class DrawText(Draw):
-    def __init__(self, x1: int, y1: int, text: str, font: skia.Font, color: str):
+    def __init__(self, x1: float, y1: float, text: str, font: skia.Font, color: str):
         super().__init__(
             y1,
             x1,
@@ -43,7 +45,7 @@ class DrawText(Draw):
 
 
 class DrawRect(Draw):
-    def __init__(self, x1: int, y1: int, x2: int, y2: int, color: str):
+    def __init__(self, x1: float, y1: float, x2: float, y2: float, color: str):
         super().__init__(y1, x1, x2, y2, color)
         self.rect = skia.Rect.MakeLTRB(x1, y1, x2, y2)
 
@@ -62,7 +64,7 @@ class DrawRect(Draw):
 
 
 class DrawLine(Draw):
-    def __init__(self, x1: int, y1: int, x2: int, y2: int):
+    def __init__(self, x1: float, y1: float, x2: float, y2: float):
         super().__init__(y1, x1, x2, y2, "black")
         self.rect = skia.Rect.MakeLTRB(x1, y1, x2, y2)
 

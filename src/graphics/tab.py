@@ -19,7 +19,7 @@ from src.global_value import CHROME_PX, FONT_RATIO, SCROLL_STEP
 
 
 class Tab:
-    def __init__(self, width: int, height: int):
+    def __init__(self, width: float, height: float):
         self.scroll = 0
         with open("src/browser.css") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
@@ -152,7 +152,7 @@ class Tab:
         url = resolve_url(elt.attributes["action"], self.url)
         self.load(url, body)
 
-    def click(self, x: int, y: int):
+    def click(self, x: float, y: float):
         self.forcus = None
         y += self.scroll
         objs: List[LayoutObject] = [

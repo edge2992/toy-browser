@@ -11,7 +11,9 @@ if TYPE_CHECKING:
 FONTS: Dict[Tuple[Union[str, None], str, str], skia.Font] = {}  # font cache
 
 
-def get_font(family: Union[str, None], size: int, weight: str, slant: str) -> skia.Font:
+def get_font(
+    family: Union[str, None], size: float, weight: str, slant: str
+) -> skia.Font:
     key = (family, weight, slant)
     if key not in FONTS:
         if weight == "bold":
@@ -46,10 +48,10 @@ class LayoutObject(Generic[PN, PRN, CN]):
         self.parent = parent
         self.previous = previous
         self.children: List[CN] = []
-        self.x: int
-        self.y: int
-        self.width: int
-        self.height: int
+        self.x: Union[int, float]
+        self.y: Union[int, float]
+        self.width: Union[int, float]
+        self.height: Union[int, float]
         self.font_ratio = font_ratio
 
     def get_font(self, node: HTMLNode) -> skia.Font:
@@ -59,13 +61,13 @@ class LayoutObject(Generic[PN, PRN, CN]):
 
         if style == "normal":
             style = "roman"
-        size = int(float(node.style["font-size"][:-2]) * self.font_ratio)
+        size = float(node.style["font-size"][:-2]) * self.font_ratio
 
         try:
             font = get_font(family, size, weight, style)
         except Exception as e:
             # except tkinter.TclError as e:
-            print("[warning]", e)
+            print("[warning fonts]", e)
             font = get_font(None, size, weight, style)
         return font
 

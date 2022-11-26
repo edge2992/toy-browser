@@ -35,29 +35,19 @@ class LineLayout(
         for word in self.children:
             word.layout()
 
-        try:
-            max_ascent = max(-word.font.getMetrics().fAscent for word in self.children)
-        except ValueError as e:
-            print("[max_ascent warnings] ", e)
-            print("self node", self.node)
-            print("parent node", self.parent.node)
-            max_ascent = 0
+        if not self.children:
+            self.height = 0
+            return
+
+        max_ascent = max([-word.font.getMetrics().fAscent for word in self.children])
 
         baseline = self.y + 1.25 * max_ascent
         for word in self.children:
-            word.y = int(baseline - word.font.getMetrics().fAscent)
+            word.y = baseline + word.font.getMetrics().fAscent
 
-        try:
-            max_descent = max(
-                [word.font.getMetrics().fDescent for word in self.children]
-            )
-        except ValueError as e:
-            print("[max_decent warnings] ", e)
-            print("self node", self.node)
-            print("parent node", self.parent.node)
-            max_descent = 0
+        max_descent = max([word.font.getMetrics().fDescent for word in self.children])
 
-        self.height = int(1.25 * (max_ascent + max_descent))
+        self.height = 1.25 * (max_ascent + max_descent)
 
     def paint(self, display_list: List[Draw]) -> None:
         for child in self.children:
