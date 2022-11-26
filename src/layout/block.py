@@ -68,6 +68,7 @@ class BlockLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], LayoutOb
         for child in self.children:
             child.paint(cmds)
 
+        cmds = self.paint_visual_effects(self.node, cmds, rect)
         display_list.extend(cmds)
 
     def __repr__(self):

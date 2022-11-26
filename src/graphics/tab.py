@@ -101,6 +101,10 @@ class Tab:
 
         return rules
 
+    def raster(self, canvas):
+        for cmd in self.display_list:
+            cmd.execute(canvas)
+
     def render(self) -> None:
         # layout -> paint
         style(self.nodes, sorted(self.rules, key=cascade_priority))
@@ -121,14 +125,6 @@ class Tab:
             x = obj.x + obj.font.measureText(text)
             y = obj.y - self.scroll + CHROME_PX
             self.display_list.append(DrawLine(x, y, x, y + obj.height))
-
-    def draw(self, canvas):
-        for cmd in self.display_list:
-            if cmd.top > self.scroll + self.height - CHROME_PX:
-                continue
-            if cmd.bottom < self.scroll:
-                continue
-            cmd.execute(self.scroll - CHROME_PX, canvas)
 
     def allowed_request(self, url: str):
         return self.allowed_origins == None or url_origin(url) in self.allowed_origins

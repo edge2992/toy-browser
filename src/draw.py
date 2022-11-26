@@ -99,3 +99,22 @@ class DrawRRect(Draw):
 
     def __repr__(self) -> str:
         return f"DrawRRect({self.color})"
+
+
+class ClipRRect(Draw):
+    def __init__(self, rect, radius, children, should_clip=True):
+        self.rect = rect
+        self.rrect = skia.RRect.MakeRectXY(rect, radius, radius)
+        self.children = children
+        self.should_clip = should_clip
+
+    def execute(self, canvas):
+        if self.should_clip:
+            canvas.save()
+            canvas.clipRRect(self.rrect)
+
+        for cmd in self.children:
+            cmd.execute(canvas)
+
+        if self.should_clip:
+            canvas.restore()

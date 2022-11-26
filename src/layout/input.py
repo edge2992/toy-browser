@@ -54,6 +54,8 @@ class InputLayout(ChildLayoutObject):
         color = self.node.style["color"]
         cmds.append(DrawText(self.x, self.y, text, self.font, color))
 
+        cmds = self.paint_visual_effects(self.node, cmds, rect)
+
         display_list.extend(cmds)
 
     def __repr__(self) -> str:

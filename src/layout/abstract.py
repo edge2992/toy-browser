@@ -1,8 +1,11 @@
 from __future__ import annotations
 import skia
 from typing import Dict, Generic, List, Tuple, TypeVar, Union, TYPE_CHECKING
+from src.draw import ClipRRect
+from src.layer import SaveLayer
 
 from src.global_value import FONT_RATIO
+from src.util.draw_skia import parse_blend_mode
 
 if TYPE_CHECKING:
     from src.draw import Draw
@@ -78,3 +81,28 @@ class LayoutObject(Generic[PN, PRN, CN]):
     def paint(self, display_list: List[Draw]):
         """描画するdisplay_listを作成する"""
         raise NotImplementedError
+
+    def paint_visual_effects(self, node: HTMLNode, cmds: List[Draw], rect) -> List[Draw]:
+        opacity = float(node.style.get("opacity", "1.0"))
+        blend_mode = parse_blend_mode(node.style.get("mix-blend-mode", ""))
+
+        border_radius = float(node.style.get("border-radius", "0px")[:-2])
+        if node.style.get("overflow", "visible") == "clip":
+            clip_radius = border_radius
+        else:
+            clip_radius = 0
+
+        needs_clip = node.style.get("overflow", "visible") == "clip"
+        needs_blend_isolation = (
+            blend_mode != skia.BlendMode.kSrcOver or needs_clip or opacity != 1.0
+        )
+
+        return [
+            SaveLayer(
+                skia.Paint(BlendMode=blend_mode, Alphaf=opacity),
+                [
+                    ClipRRect(rect, clip_radius, cmds, should_clip=needs_clip),
+                ],
+                should_save=needs_blend_isolation,
+            )
+        ]

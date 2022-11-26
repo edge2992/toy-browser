@@ -117,6 +117,9 @@ class InlineLayout(LayoutObject[LayoutObject, Union[LayoutObject, None], "LineLa
         for child in self.children:
             child.paint(cmds)
 
+        if not is_atomic:
+            cmds = self.paint_visual_effects(self.node, cmds, rect)
+
         display_list.extend(cmds)
 
     def __repr__(self) -> str:

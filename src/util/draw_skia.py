@@ -32,8 +32,17 @@ def parse_color(color):
             0xFF, int(color[1] * 2, 16), int(color[2] * 2, 16), int(color[3] * 2, 16)
         )
     else:
-        print("[warining] unknown color", color)
+        # print("[warining] unknown color", color)
         return skia.ColorBLACK
+
+
+def parse_blend_mode(blend_mode_str: str):
+    if blend_mode_str == "multiply":
+        return skia.BlendMode.kMultiply
+    elif blend_mode_str == "difference":
+        return skia.BlendMode.kDifference
+    else:
+        return skia.BlendMode.kSrcOver
 
 
 def draw_line(canvas, x1, y1, x2, y2):

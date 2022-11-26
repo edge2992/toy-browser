@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import ctypes
+import math
 import sys
 from enum import Enum, auto
-from typing import List, Union
+from typing import List
 
 import sdl2
 import skia
@@ -27,9 +28,11 @@ class Browser:
         self.hstep = HSTEP
         self.vstep = VSTEP
         self.tabs: List[Tab] = []  # type: ignore
-        self.active_tab: Union[None, int] = None  # type: ignore
+        self.active_tab: int
         self.forcus: Forcus = Forcus.NONE
         self.address_bar = ""
+        self.chrome_surface = skia.Surface(self.width, CHROME_PX)
+        self.tab_surface: skia.Surface
 
         if sdl2.SDL_BYTEORDER == sdl2.SDL_BIG_ENDIAN:
             self.RED_MASK = 0xFF000000
@@ -67,23 +70,53 @@ class Browser:
         new_tab.load(url)
         self.active_tab = len(self.tabs)
         self.tabs.append(new_tab)
+        self.raster_chrome()
+        self.raster_tab()
         self.draw()
+
+    def raster_tab(self):
+        active_tab = self.tabs[self.active_tab]
+        tab_height = math.ceil(active_tab.document.height)
+
+        if not hasattr(self, "tab_surface") or tab_height != self.tab_surface.height():
+            self.tab_surface = skia.Surface(self.width, tab_height)
+
+        canvas = self.tab_surface.getCanvas()
+        canvas.clear(skia.ColorWHITE)
+        active_tab.raster(canvas)
+
+    def raster_chrome(self):
+        canvas = self.chrome_surface.getCanvas()
+        canvas.clear(skia.ColorWHITE)
+
+        self.__raster_tab_bar(canvas)
+        self.__raster_address_bar(canvas)
+        self.__raster_back_button(canvas)
+        self.__raster_forward_button(canvas)
 
     def draw(self):
         canvas = self.root_surface.getCanvas()
         canvas.clear(skia.ColorWHITE)
 
-        tabfont = skia.Font(skia.Typeface("Arial"), 20)
-        buttonfont = skia.Font(skia.Typeface("Arial"), 30)
+        tab_rect = skia.Rect.MakeLTRB(0, CHROME_PX, self.width, self.height)
+        tab_offset = CHROME_PX - self.tabs[self.active_tab].scroll
+        canvas.save()
+        canvas.clipRect(tab_rect)
+        canvas.translate(0, tab_offset)
+        self.tab_surface.draw(canvas, 0, 0)
+        canvas.restore()
 
-        self._draw_tab(canvas)
-        self._draw_tab_bar(canvas, tabfont, buttonfont)
-        self._draw_back_button(canvas)
-        self._draw_forward_button(canvas)
-        self._draw_address_bar(canvas, buttonfont)
+        chrome_rect = skia.Rect.MakeLTRB(0, 0, self.width, CHROME_PX)
+        canvas.save()
+        canvas.clipRect(chrome_rect)
+        self.chrome_surface.draw(canvas, 0, 0)
+        canvas.restore()
 
+        # This makes an image interface to the Skia surface, but
+        # doesn't copy the data.
         skia_image = self.root_surface.makeImageSnapshot()
         skia_bytes = skia_image.tobytes()
+
         depth = 32
         pitch = 4 * self.width
         sdl_surface = sdl2.SDL_CreateRGBSurfaceFrom(
@@ -99,19 +132,15 @@ class Browser:
         )
         rect = sdl2.SDL_Rect(0, 0, self.width, self.height)
         window_surface = sdl2.SDL_GetWindowSurface(self.sdl_window)
+        # SDL_BlitSurface its what actually does the copy
         sdl2.SDL_BlitSurface(sdl_surface, rect, window_surface, rect)
         sdl2.SDL_UpdateWindowSurface(self.sdl_window)
 
-    def _draw_tab(self, canvas):
-        # タブの描画
-        assert self.active_tab is not None
-        self.tabs[self.active_tab].draw(canvas)
-        # self.canvas.create_rectangle(
-        #     0, 0, self.width, CHROME_PX, fill="white", outline="white"
-        # )
-
-    def _draw_tab_bar(self, canvas, tabfont, buttonfont):
+    def __raster_tab_bar(self, canvas):
         # タブバーの描画
+        tabfont = skia.Font(skia.Typeface("Arial"), 20)
+        buttonfont = skia.Font(skia.Typeface("Arial"), 30)
+
         for i, tab in enumerate(self.tabs):
             name = "Tab {}".format(i)
             x1, x2 = 40 + 80 * i, 120 + 80 * i
@@ -121,29 +150,30 @@ class Browser:
             if i == self.active_tab:
                 draw_line(canvas, 0, 40, x1, 40)
                 draw_line(canvas, x2, 40, self.width, 40)
+
         draw_rect(canvas, 10, 10, 30, 30)
         draw_text(canvas, 11, 4, "+", buttonfont)
 
-    def _draw_back_button(self, canvas):
+    def __raster_back_button(self, canvas):
         # 戻るボタンの描画
-        assert self.active_tab is not None
         draw_rect(canvas, 10, 50, 35, 90)
         fill = "black" if self.tabs[self.active_tab].history.has_previous() else "gray"
         path = skia.Path().moveTo(15, 70).lineTo(30, 55).lineTo(30, 85)
         paint = skia.Paint(Color=parse_color(fill), Style=skia.Paint.kFill_Style)
         canvas.drawPath(path, paint)
 
-    def _draw_forward_button(self, canvas):
+    def __raster_forward_button(self, canvas):
         # 進むボタンの描画
-        assert self.active_tab is not None
         draw_rect(canvas, 40, 50, 65, 90)
         fill = "black" if self.tabs[self.active_tab].history.has_next() else "gray"
         path = skia.Path().moveTo(45, 55).lineTo(59, 70).lineTo(45, 85)
         paint = skia.Paint(Color=parse_color(fill), Style=skia.Paint.kFill_Style)
         canvas.drawPath(path, paint)
 
-    def _draw_address_bar(self, canvas, buttonfont):
+    def __raster_address_bar(self, canvas):
         # アドレスバーの描画
+        buttonfont = skia.Font(skia.Typeface("Arial"), 30)
+
         draw_rect(canvas, 70, 50, self.width - 10, 90)
         if self.forcus == Forcus.ADDRESS_BAR:
             draw_text(
@@ -156,9 +186,7 @@ class Browser:
             w = buttonfont.measureText(self.address_bar)
             draw_line(canvas, 85 + w, 55, 85 + w, 90)
         else:
-            assert self.active_tab is not None
             url = self.tabs[self.active_tab].url
-            assert url is not None
             draw_text(canvas, 85, 55, url, buttonfont)
 
     def handle_click(self, e: sdl2.events.SDL_MouseButtonEvent):
@@ -182,10 +210,12 @@ class Browser:
                 print("address bar click", e.x, e.y)
                 self.forcus = Forcus.ADDRESS_BAR
                 self.address_bar = ""
+            self.raster_chrome()
         else:
             assert self.active_tab is not None
             self.forcus = Forcus.CONTENT
             self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
+            self.raster_tab()
         self.draw()
 
     def handle_middle_click(self, e: sdl2.events.SDL_MouseButtonEvent):
@@ -210,11 +240,13 @@ class Browser:
                     self.load(url)
             elif 80 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
                 pass
+            self.raster_chrome()
         else:
             assert self.active_tab is not None
             url = self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
             if url is not None:
                 self.load(url)
+            self.raster_tab()
         self.draw()
 
     def handle_key(self, key: str):
