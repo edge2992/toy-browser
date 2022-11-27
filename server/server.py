@@ -52,6 +52,16 @@ def show_comments(session: Dict) -> str:
     return out
 
 
+def show_count():
+    out = "<!dotctype html>"
+    out += "<div>"
+    out += " Let's count up to 99!"
+    out += "</div>"
+    out += "<div>Output</div>"
+    out += "<script src=/eventloop.js></script>"
+    return out
+
+
 def login_form(session: Dict):
     out = "<!doctype html>"
     out += "<form action=/ method=post>"
@@ -108,10 +118,15 @@ def do_request(
 ) -> Tuple[str, str]:
     if method == "GET" and url == "/":
         return "200 OK", show_comments(session)
+    elif method == "GET" and url == "/count":
+        return "200 OK", show_count()
     elif method == "GET" and url == "/login":
         return "200 OK", login_form(session)
     elif method == "GET" and url == "/comment.js":
         with open("server/comment.js", "r") as f:
+            return "200 OK", f.read()
+    elif method == "GET" and url == "/eventloop.js":
+        with open("server/eventloop.js", "r") as f:
             return "200 OK", f.read()
     elif method == "GET" and url == "/comment.css":
         with open("server/comment.css", "r") as f:
