@@ -5,17 +5,18 @@ from typing import List, Union
 
 import dukpy
 
-from src.graphics.history import History
 from src.cssparser import CSSParser, style
 from src.draw import Draw, DrawLine
+from src.global_value import CHROME_PX, FONT_RATIO, SCROLL_STEP
+from src.graphics.history import History
 from src.jscontext import JSContext
 from src.layout import DocumentLayout, InputLayout, LayoutObject
 from src.network import request
 from src.selector import cascade_priority
+from src.task import Task, TaskRunner
 from src.text import Element, HTMLParser, Text
 from src.util.node import tree_to_list
 from src.util.url import resolve_url, url_origin
-from src.global_value import CHROME_PX, FONT_RATIO, SCROLL_STEP
 
 
 class Tab:
@@ -30,6 +31,13 @@ class Tab:
         self.allowed_origins: Union[List[str], None] = None
         self.font_ratio = FONT_RATIO
         self.forcus: Union[Element, None] = None
+        self.task_runner = TaskRunner()
+
+    def run_script(self, url, body):
+        try:
+            print("Script returned: ", self.js.run(body))
+        except dukpy.JSRuntimeError as e:
+            print("Script", url, "crashed", e)
 
     def load(self, url: str, body: Union[str, None] = None):
         self.history.append(url)
@@ -59,10 +67,8 @@ class Tab:
                 print("Blocked script", script, "due to CSP")
                 continue
             header, body, _ = request(resolve_url(script, self.url), self.url)
-            try:
-                self.js.run(body)
-            except dukpy.JSRuntimeError as e:
-                print("Script", script, "crashed", e)
+            task = Task(self.run_script, script_url, body)
+            self.task_runner.schedule_task(task)
         self.render()
 
     def _rules(self):

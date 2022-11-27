@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import threading
 from typing import TYPE_CHECKING, Dict, List, Union
 
 import dukpy
 
 from src.cssparser import CSSParser
 from src.network import request
+from src.task import Task
 from src.text import Element, HTMLParser
 from src.util.node import tree_to_list
 from src.util.url import resolve_url, url_origin
@@ -14,6 +16,8 @@ if TYPE_CHECKING:
     from src.graphics.tab import Tab
 
 EVENT_DISPATCH_CODE: str = "new Node(dukpy.handle).dispatchEvent(new Event(dukpy.type))"
+SETTIMEOUT_CODE = "__runSetTimeout(dukpy.handle)"
+XHR_ONLOAD_CODE = "__runXHROnload(dukpy.out, dukpy.handle)"
 
 
 class JSContext:
@@ -25,6 +29,7 @@ class JSContext:
         self.interp.export_function("getAttribute", self.getAttribute)
         self.interp.export_function("innerHTML_set", self.innerHTML_set)
         self.interp.export_function("XMLHttpRequest_send", self.XMLHttpRequest_send)
+        self.interp.export_function("setTimeout", self.setTimeout)
 
         with open("src/runtime.js") as f:
             self.interp.evaljs(f.read())
@@ -70,12 +75,37 @@ class JSContext:
         elt = self.handle_to_node[handle]
         return elt.attributes.get(attr, None)
 
-    def XMLHttpRequest_send(self, method: str, url: str, body: Union[str, None]):
+    def dispatch_xhr_onload(self, out, handle):
+        _ = self.interp.evaljs(XHR_ONLOAD_CODE, out=out, handle=handle)
+
+    def XMLHttpRequest_send(
+        self, method: str, url: str, body: Union[str, None], isasync: bool, handle: int
+    ):
         full_url = resolve_url(self.tab.url, url)
         assert full_url is not None
         if not self.tab.allowed_request(full_url):
             raise Exception("Cross-origin XHR blocked by CSP")
         if url_origin(full_url) != url_origin(self.tab.url):
             raise Exception("Cross-origin XHR request not allowed")
-        _, out, _ = request(full_url, self.tab.url, body)
-        return out
+
+        def run_load():
+            headers, response, _ = request(full_url, self.tab.url, payload=body)
+            task = Task(self.dispatch_xhr_onload, response, handle)
+            self.tab.task_runner.schedule_task(task)
+            if not isasync:
+                return response
+
+        if not isasync:
+            return run_load()
+        else:
+            threading.Thread(target=run_load).start()
+
+    def dispatch_settimeout(self, handle: int):
+        self.interp.evaljs(SETTIMEOUT_CODE, handle=handle)
+
+    def setTimeout(self, handle: int, time: float):
+        def run_callback():
+            task = Task(self.dispatch_settimeout, handle)
+            self.tab.task_runner.schedule_task(task)
+
+        threading.Timer(time / 1000.0, run_callback).start()

@@ -355,3 +355,4 @@ if __name__ == "__main__":
                     browser.handle_fontdown(event.key)
             elif event.type == sdl2.SDL_TEXTINPUT:
                 browser.handle_key(event.text.text.decode("utf8"))
+        browser.tabs[browser.active_tab].task_runner.run()
