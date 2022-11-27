@@ -89,4 +89,19 @@ function __runXHROnload(body, handle) {
   }
 }
 
+RAF_LISTENERS = []
+
+function requestAnimatilFrame(fn) {
+  RAF_LISTENERS.push(fn);
+  call_python("requestAnimationFrame");
+}
+
+function __runRAFHandlers() {
+  var handlers_copy = RAF_LISTENERS;
+  RAF_LISTENERS = [];
+  for (var i = 0; i < handlers_copy.length; i++) {
+    handlers_copy[i]();
+  }
+}
+
 console.log("Hi from JavaScript!");

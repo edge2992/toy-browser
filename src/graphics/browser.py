@@ -4,14 +4,16 @@ import ctypes
 import math
 import sys
 from enum import Enum, auto
+import threading
 from typing import List
 
 import sdl2
 import skia
 
 from src.cssparser import CSSParser
-from src.global_value import CHROME_PX, HEIGHT, HSTEP, VSTEP, WIDTH
+from src.global_value import CHROME_PX, HEIGHT, HSTEP, REFRESH_RATE_SEC, VSTEP, WIDTH
 from src.graphics.tab import Tab
+from src.task import Task
 from src.util.draw_skia import draw_line, draw_rect, draw_text, parse_color
 
 
@@ -33,6 +35,9 @@ class Browser:
         self.address_bar = ""
         self.chrome_surface = skia.Surface(self.width, CHROME_PX)
         self.tab_surface: skia.Surface
+        self.needs_raster_and_draw: bool = False
+        self.animation_timer = None
+        self.needs_animation_frame: bool = True
 
         if sdl2.SDL_BYTEORDER == sdl2.SDL_BIG_ENDIAN:
             self.RED_MASK = 0xFF000000
@@ -64,15 +69,39 @@ class Browser:
         with open("src/browser.css", mode="r") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
 
-    def load(self, url: str):
-        print("browser load")
-        new_tab = Tab(self.width, self.height)
-        new_tab.load(url)
-        self.active_tab = len(self.tabs)
-        self.tabs.append(new_tab)
+    def set_needs_raster_and_draw(self):
+        self.needs_raster_and_draw = True
+        self.needs_animation_frame = True
+
+    def set_needs_animation_frame(self, tab):
+        if tab == self.tabs[self.active_tab]:
+            self.needs_animation_frame = True
+
+    def schedule_animation_frame(self):
+        def callback():
+            active_tab = self.tabs[self.active_tab]
+            task = Task(active_tab.render)
+            active_tab.task_runner.schedule_task(task)
+            self.animation_timer = None
+
+        if self.needs_animation_frame and not self.animation_timer:
+            self.animation_timer = threading.Timer(REFRESH_RATE_SEC, callback)
+            self.animation_timer.start()
+
+    def raster_and_draw(self):
+        if not self.needs_raster_and_draw:
+            return
         self.raster_chrome()
         self.raster_tab()
         self.draw()
+        self.needs_raster_and_draw = False
+
+    def load(self, url: str):
+        new_tab = Tab(self)
+        self.active_tab = len(self.tabs)
+        self.tabs.append(new_tab)
+        new_tab.load(url)
+        self.raster_and_draw()
 
     def raster_tab(self):
         active_tab = self.tabs[self.active_tab]
@@ -210,13 +239,14 @@ class Browser:
                 print("address bar click", e.x, e.y)
                 self.forcus = Forcus.ADDRESS_BAR
                 self.address_bar = ""
-            self.raster_chrome()
+            self.set_needs_raster_and_draw()
         else:
             assert self.active_tab is not None
             self.forcus = Forcus.CONTENT
-            self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
-            self.raster_tab()
-        self.draw()
+            active_tab = self.tabs[self.active_tab]
+            task = Task(active_tab.click, e.x, e.y - CHROME_PX)
+            active_tab.task_runner.schedule_task(task)
+        # self.draw()
 
     def handle_middle_click(self, e: sdl2.events.SDL_MouseButtonEvent):
         self.forcus = Forcus.NONE
@@ -240,7 +270,7 @@ class Browser:
                     self.load(url)
             elif 80 <= e.x < WIDTH - 10 and 40 <= e.y < 90:
                 pass
-            self.raster_chrome()
+            self.set_needs_raster_and_draw()
         else:
             assert self.active_tab is not None
             url = self.tabs[self.active_tab].click(e.x, e.y - CHROME_PX)
@@ -257,7 +287,7 @@ class Browser:
 
         if self.forcus == Forcus.ADDRESS_BAR:
             self.address_bar += key
-            self.draw()
+            self.set_needs_raster_and_draw()
         elif self.forcus == Forcus.CONTENT:
             assert self.active_tab is not None
             self.tabs[self.active_tab].keypress(key)
@@ -266,7 +296,7 @@ class Browser:
     def handle_backspace(self, e):
         if self.forcus == Forcus.ADDRESS_BAR:
             self.address_bar = self.address_bar[:-1]
-            self.draw()
+            self.set_needs_raster_and_draw()
         elif self.forcus == Forcus.CONTENT:
             assert self.active_tab is not None
             self.tabs[self.active_tab].backspace()
@@ -328,7 +358,7 @@ if __name__ == "__main__":
     browser.load(sys.argv[1])
     event = sdl2.SDL_Event()
     while True:
-        while sdl2.SDL_PollEvent(ctypes.byref(event)) != 0:
+        if sdl2.SDL_PollEvent(ctypes.byref(event)) != 0:
             if event.type == sdl2.SDL_QUIT:
                 browser.handle_quit()
                 sdl2.SDL_Quit()
@@ -355,4 +385,7 @@ if __name__ == "__main__":
                     browser.handle_fontdown(event.key)
             elif event.type == sdl2.SDL_TEXTINPUT:
                 browser.handle_key(event.text.text.decode("utf8"))
+
         browser.tabs[browser.active_tab].task_runner.run()
+        browser.raster_and_draw()
+        browser.schedule_animation_frame()

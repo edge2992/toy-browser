@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import urllib.parse
-from typing import List, Union
+from typing import List, Union, TYPE_CHECKING
 
 import dukpy
 
@@ -18,20 +18,31 @@ from src.text import Element, HTMLParser, Text
 from src.util.node import tree_to_list
 from src.util.url import resolve_url, url_origin
 
+if TYPE_CHECKING:
+    from src.graphics.browser import Browser
+
 
 class Tab:
-    def __init__(self, width: float, height: float):
+    def __init__(self, browser: Browser):
         self.scroll = 0
         with open("src/browser.css", mode="r") as f:
             self.default_style_sheet = CSSParser(f.read()).parse()
         self.history = History()
-        self.width = width
-        self.height = height
+        self.browser = browser
+        # TODO: width, heightをタブが持つ必要はない
+        # browserでwidthかheightが変更された時にTabに通知できれば大丈夫
+        self.width = browser.width
+        self.height = browser.height
         self.url = None
         self.allowed_origins: Union[List[str], None] = None
         self.font_ratio = FONT_RATIO
         self.forcus: Union[Element, None] = None
         self.task_runner = TaskRunner()
+        self.needs_render = False
+
+    def set_needs_render(self):
+        self.needs_render = True
+        self.browser.set_needs_animation_frame(self)
 
     def run_script(self, url, body):
         try:
@@ -69,7 +80,7 @@ class Tab:
             header, body, _ = request(resolve_url(script, self.url), self.url)
             task = Task(self.run_script, script_url, body)
             self.task_runner.schedule_task(task)
-        self.render()
+        self.set_needs_render()
 
     def _rules(self):
         rules = self.default_style_sheet.copy()
@@ -113,6 +124,9 @@ class Tab:
 
     def render(self) -> None:
         # layout -> paint
+        if not self.needs_render:
+            return
+        self.js.interp.evaljs("__runRAFHandlers()")
         style(self.nodes, sorted(self.rules, key=cascade_priority))
         self.document = DocumentLayout(
             self.nodes, width=self.width, font_ratio=self.font_ratio
@@ -131,6 +145,9 @@ class Tab:
             x = obj.x + obj.font.measureText(text)
             y = obj.y - self.scroll + CHROME_PX
             self.display_list.append(DrawLine(x, y, x, y + obj.height))
+
+        self.needs_render = False
+        self.browser.set_needs_raster_and_draw()
 
     def allowed_request(self, url: str):
         return self.allowed_origins == None or url_origin(url) in self.allowed_origins
@@ -179,7 +196,8 @@ class Tab:
                         return
                     self.forcus = elt
                     elt.attributes["value"] = ""
-                    return self.render()
+                    self.set_needs_render()
+                    return
                 elif elt.tag == "button":
                     if self.js.dispatch_event("click", elt):
                         return
@@ -200,12 +218,12 @@ class Tab:
             if self.js.dispatch_event("keydown", self.forcus):
                 return
             self.forcus.attributes["value"] += char
-            self.render()
+            self.set_needs_render()
 
     def backspace(self):
         if self.forcus:
             self.forcus.attributes["value"] = self.forcus.attributes["value"][:-1]
-            self.render()
+            self.set_needs_render()
 
     def go_back(self):
         url = self.history.previous()
@@ -227,18 +245,18 @@ class Tab:
 
     def fontup(self):
         self.font_ratio += 0.1
-        self.render()
+        self.set_needs_render()
 
     def fontdown(self):
         self.font_ratio -= 0.1
-        self.render()
+        self.set_needs_render()
 
     def resize(self, width, height):
         print("resizing tag...", width, height)
         if self.width != width:
             # widthを変更した場合には再レイアウトが必要
             self.width = width
-            self.render()
+            self.set_needs_render()
 
         self.height = height
         self.width = width

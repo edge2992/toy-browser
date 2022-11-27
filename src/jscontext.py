@@ -30,6 +30,7 @@ class JSContext:
         self.interp.export_function("innerHTML_set", self.innerHTML_set)
         self.interp.export_function("XMLHttpRequest_send", self.XMLHttpRequest_send)
         self.interp.export_function("setTimeout", self.setTimeout)
+        self.interp.export_function("requestAnimationFrame", self.requestAnimationFrame)
 
         with open("src/runtime.js") as f:
             self.interp.evaljs(f.read())
@@ -48,7 +49,7 @@ class JSContext:
         elt.children = new_nodes
         for child in elt.children:
             child.parent = elt
-        self.tab.render()
+        self.tab.set_needs_render()
 
     def dispatch_event(self, type: str, elt: Element) -> bool:
         handle = self.node_to_handle.get(elt, -1)
@@ -109,3 +110,6 @@ class JSContext:
             self.tab.task_runner.schedule_task(task)
 
         threading.Timer(time / 1000.0, run_callback).start()
+
+    def requestAnimationFrame(self):
+        self.tab.browser.set_needs_animation_frame(self.tab)

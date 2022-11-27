@@ -38,5 +38,6 @@ class TaskRunner:
 
         self.condition.acquire(blocking=True)
         if len(self.tasks) == 0:
-            self.condition.wait()
+            pass
+            # self.condition.wait()
         self.condition.release()
